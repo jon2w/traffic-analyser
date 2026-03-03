@@ -1,6 +1,8 @@
 """
 detect/yolo_day.py — YOLO-based vehicle detection for daytime footage.
 """
+import torch
+torch.backends.nnpack.enabled = False
 
 import cv2
 import numpy as np
@@ -10,8 +12,7 @@ from config import (YOLO_MODEL, YOLO_CONFIDENCE, YOLO_CLASSES, YOLO_DEVICE)
 
 import os
 
-import torch
-torch.backends.nnpack.enabled = False
+
 
 
 
@@ -30,6 +31,7 @@ def _get_model():
             raise ImportError("Run: pip install ultralytics")
         print(f"Loading YOLO model: {YOLO_MODEL}")
         _model = YOLO(YOLO_MODEL)
+        torch.backends.nnpack.enabled = False  # re-disable after ultralytics loads
     return _model
 
 
