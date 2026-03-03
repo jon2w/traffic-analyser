@@ -7,6 +7,14 @@ import numpy as np
 
 from config import (YOLO_MODEL, YOLO_CONFIDENCE, YOLO_CLASSES, YOLO_DEVICE)
 
+
+import os
+
+import torch
+torch.backends.nnpack.enabled = False
+
+
+
 # COCO class id → human label mapping (filtered to vehicles only)
 CLASS_NAMES = {2: "car", 3: "motorbike", 5: "bus", 7: "truck"}
 
