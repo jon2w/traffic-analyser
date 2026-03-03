@@ -13,8 +13,8 @@ from config import (
     MAX_DISAPPEARED_MS, MAX_TRACKER_DISTANCE,
     MIN_TRACK_FRAMES, SPEED_WINDOW_MS,
     SPEED_TRIM_FRACTION, SPEED_EMA_ALPHA,
+    MIN_TRACK_DISPLACEMENT_PX,
 )
-
 
 class CentroidTracker:
     """
@@ -191,6 +191,12 @@ class VehicleTracker:
         path = self.paths[oid]
 
         if len(path) < MIN_TRACK_FRAMES:
+            self.paths.pop(oid, None)
+            return
+
+        # Reject stationary detections — total displacement too small
+        total_displacement = math.hypot(path[-1][0] - path[0][0], path[-1][1] - path[0][1])
+        if total_displacement < MIN_TRACK_DISPLACEMENT_PX:
             self.paths.pop(oid, None)
             return
 
