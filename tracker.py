@@ -249,7 +249,7 @@ class VehicleTracker:
         if not path or len(path) < 2:
             return ""
         xs = [p[0] for p in path]
-        d  = "→" if xs[-1] > xs[0] else "←"
+        d  = "->" if xs[-1] > xs[0] else "<-"
         spd = self.speeds.get(oid, 0.0)
         cls = self.classes.get(oid, "")
         return f"{d} {spd:.0f}km/h {cls}".strip()
