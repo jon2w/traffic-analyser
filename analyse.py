@@ -23,6 +23,8 @@ import numpy as np
 from config import (
     NIGHT_BRIGHTNESS_THRESHOLD,
     THUMBNAILS_ROOT,
+    PPM_MAIN_LEFT,
+    PPM_MAIN_RIGHT,
 )
 from zones_loader import ZONES
 from tracker import VehicleTracker
