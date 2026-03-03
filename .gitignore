@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+traffic_venv/
+
+# Virtual environments
+*_venv/
+*.egg-info/
+
+# YOLO / ML model weights (large files)
+*.pt
+*.weights
+
+# Video / image files
+*.mp4
+*.avi
+*.jpg
+*.jpeg
+*.png
+*.thumb
+
+# Database / logs
+*.log
+*.sql
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
