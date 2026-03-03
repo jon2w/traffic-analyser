@@ -69,7 +69,7 @@ LIGHT_MAX_AREA        = 8000
 # =============================================================================
 # TRACKING
 # =============================================================================
-MAX_DISAPPEARED_MS   = 1000    # drop track after this many ms unseen
+MAX_DISAPPEARED_MS   = 1500    # drop track after this many ms unseen
 MAX_TRACKER_DISTANCE = 500     # max px a detection can jump between frames
 MIN_TRACK_FRAMES     = 8       # minimum frames to count as real vehicle
 SPEED_WINDOW_MS      = 600     # measure speed over this time window
