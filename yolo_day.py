@@ -1,6 +1,19 @@
 """
 detect/yolo_day.py — YOLO-based vehicle detection for daytime footage.
 """
+
+
+import warnings
+warnings.filterwarnings("ignore")
+import logging
+logging.disable(logging.WARNING)
+
+import os
+os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "1"
+
+
+
+
 import torch
 torch.backends.nnpack.enabled = False
 
@@ -10,7 +23,6 @@ import numpy as np
 from config import (YOLO_MODEL, YOLO_CONFIDENCE, YOLO_CLASSES, YOLO_DEVICE)
 
 
-import os
 
 
 
