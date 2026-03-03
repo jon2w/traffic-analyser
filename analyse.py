@@ -21,10 +21,10 @@ import cv2
 import numpy as np
 
 from config import (
-    NIGHT_BRIGHTNESS_THRESHOLD, ZONES,
-    PPM_MAIN_LEFT, PPM_MAIN_RIGHT,
+    NIGHT_BRIGHTNESS_THRESHOLD,
     THUMBNAILS_ROOT,
 )
+from zones_loader import ZONES
 from tracker import VehicleTracker
 
 
