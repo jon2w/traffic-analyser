@@ -35,21 +35,21 @@ PPM_MAIN_RIGHT = 33.0   # L→R lane of main road (~16m from camera)
 # Zones are defined as polygons: list of (x_fraction, y_fraction) points
 # where 0,0 = top-left and 1,1 = bottom-right of frame.
 
-# Main road — vehicles travel predominantly left/right
+# Main road — tighten top edge to exclude opposite road entirely
 ZONE_MAIN = {
     "name":      "main_road",
-    "type":      "side_on",         # side-on tracking with speed
-    "polygon":   [(0.0, 0.45), (1.0, 0.45), (1.0, 0.95), (0.0, 0.95)],
+    "type":      "side_on",
+    "polygon":   [(0.0, 0.58), (1.0, 0.58), (1.0, 0.95), (0.0, 0.95)],
     "ppm_left":  PPM_MAIN_LEFT,
     "ppm_right": PPM_MAIN_RIGHT,
 }
 
-# Opposite road — vehicles travel toward/away from camera
-# Polygon to be refined once you mark it up on a frame
+# Opposite road — tight around the actual road, excluding carpark and trees
+# Follows the road from bottom-left to top-right as it curves away
 ZONE_OPPOSITE = {
     "name":    "opposite_road",
-    "type":    "end_on",            # end-on tracking, count only
-    "polygon": [(0.25, 0.20), (0.55, 0.20), (0.55, 0.55), (0.25, 0.55)],
+    "type":    "end_on",
+    "polygon": [(0.28, 0.32), (0.50, 0.30), (0.52, 0.44), (0.30, 0.46)],
 }
 
 ZONES = [ZONE_MAIN, ZONE_OPPOSITE]
