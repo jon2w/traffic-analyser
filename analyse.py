@@ -261,7 +261,10 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
     cap.release()
     if writer:
         writer.release()
-    cv2.destroyAllWindows()
+    try:
+        cv2.destroyAllWindows()
+    except cv2.error:
+    pass
 
     # Collect all vehicles across zones
     all_vehicles = []
