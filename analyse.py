@@ -100,7 +100,8 @@ def save_thumbnail(frame, vehicle_id, recording_id, output_dir):
 # ─── Overlay ──────────────────────────────────────────────────────────────────
 
 def draw_overlay(frame, zone_trackers, night_mode, fps_actual, frame_w, frame_h):
-    from config import NIGHT_ROI_TOP, NIGHT_ROI_BOTTOM, ZONES
+    from config import NIGHT_ROI_TOP, NIGHT_ROI_BOTTOM
+    from zones_loader import ZONES
 
     # Zone polygons
     for zone in ZONES:
