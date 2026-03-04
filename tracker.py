@@ -451,7 +451,7 @@ class VehicleTracker:
 
     def active_label(self, oid):
         path = self.paths.get(oid)
-        if not path or len(path) < 2:
+        if not path or len(path) < 6:
             return ""
         d   = "->" if self._net_direction(path) == "right" else "<-"
         spd = self.speeds.get(oid, 0.0)
