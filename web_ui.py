@@ -601,7 +601,7 @@ async function loadFileTree() {
     const dayCount = files.length;
     total += dayCount;
     html += `<div class="date-group" id="grp-${dateDir}">
-      <div class="date-header" onclick="toggleGroup('${dateDir}')">
+      <div class="date-header" data-date="${dateDir}" onclick="toggleGroup(this.dataset.date)">
         <span class="chevron">▼</span> ${dateDir}
         <span style="margin-left:auto;color:var(--muted)">${dayCount}</span>
       </div>
@@ -610,7 +610,10 @@ async function loadFileTree() {
       const processed = processedFiles.has(f.path) ? 'processed' : '';
       const night     = f.is_night ? 'night' : '';
       html += `<div class="file-item ${processed} ${night}"
-                    onclick="selectFile('${f.path}', '${f.label}', '${dateDir}')">
+                    data-path="${f.path}"
+                    data-label="${f.label}"
+                    data-date="${dateDir}"
+                    onclick="selectFile(this.dataset.path, this.dataset.label, this.dataset.date)">
                  <div class="dot"></div>${f.label}
                </div>`;
     }
