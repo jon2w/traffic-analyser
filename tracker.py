@@ -174,13 +174,17 @@ class VehicleTracker:
 
     def _net_direction(self, path):
         """
-        Determine direction of travel from the median x-delta across all
-        track points. Much more robust than first-vs-last comparison —
-        a brief merge or occlusion at the end can't flip the result.
+        Determine direction of travel from the median x-delta across the
+        first 80% of track points. Ignoring the tail avoids direction flips
+        caused by a merging vehicle at the end of the track.
         """
-        if len(path) < 2:
-            return "right" if path[-1][0] > path[0][0] else "left"
-        x_deltas = [path[i][0] - path[i-1][0] for i in range(1, len(path))]
+        pts = list(path)
+        if len(pts) < 2:
+            return "right" if pts[-1][0] > pts[0][0] else "left"
+        # Use first 80% of points to avoid end-of-track merge contamination
+        cutoff = max(2, int(len(pts) * 0.8))
+        pts = pts[:cutoff]
+        x_deltas = [pts[i][0] - pts[i-1][0] for i in range(1, len(pts))]
         return "right" if np.median(x_deltas) > 0 else "left"
 
     def _finalise(self, oid):
