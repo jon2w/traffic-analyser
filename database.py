@@ -140,16 +140,20 @@ def setup(root_password):
 
 def insert_recording(filename, camera_name, recorded_at, duration_s,
                      frame_width, frame_height, fps, is_night):
-    """Insert a new recording row. Returns the new recording id."""
+    """
+    Insert a new recording row. If this filename was previously processed,
+    delete the old record first (cascades to vehicles and track_points).
+    Returns the new recording id.
+    """
     with get_connection() as conn:
         cursor = conn.cursor()
+        # Delete previous results for this file if they exist
+        cursor.execute("DELETE FROM recordings WHERE filename=%s", (filename,))
         cursor.execute("""
             INSERT INTO recordings 
                 (filename, camera_name, recorded_at, processed_at,
                  duration_s, frame_width, frame_height, fps, is_night)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                processed_at = VALUES(processed_at)
         """, (filename, camera_name, recorded_at, datetime.now(),
               duration_s, frame_width, frame_height, fps, is_night))
         return cursor.lastrowid

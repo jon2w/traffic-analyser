@@ -44,6 +44,8 @@ def get_args():
                    help="Save results to MariaDB")
     p.add_argument("--save-thumbs", action="store_true",
                    help="Save vehicle thumbnail images")
+    p.add_argument("--force", action="store_true",
+                   help="Re-process even if already in database")
     return p.parse_args()
 
 
@@ -151,7 +153,17 @@ def draw_overlay(frame, zone_trackers, night_mode, fps_actual, frame_w, frame_h)
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def analyse(input_path, output_path=None, force_night=False, force_day=False,
-            show=True, save_db=False, save_thumbs=False):
+            show=True, save_db=False, save_thumbs=False, force=False):
+
+    # Skip if already processed (unless --force)
+    if save_db and not force:
+        try:
+            import database as db
+            if db.is_already_processed(os.path.abspath(input_path)):
+                print(f"Already processed: {input_path} (use --force to reprocess)")
+                return []
+        except Exception as e:
+            print(f"DB check failed: {e}")
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
@@ -346,4 +358,5 @@ if __name__ == "__main__":
         show         = args.show,
         save_db      = args.save_db,
         save_thumbs  = args.save_thumbs,
+        force        = args.force,
     )
