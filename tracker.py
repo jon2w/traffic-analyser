@@ -3,6 +3,17 @@ tracker.py — Centroid tracker and vehicle tracker.
 
 Handles persistent ID assignment, velocity prediction,
 time-based dropout, and speed estimation.
+
+Changes vs previous version:
+  - CentroidTracker now accepts optional boxes and uses IoU as a secondary
+    match criterion. When two centroids are far apart but their boxes overlap
+    significantly they are still matched — fixes multi-track ghost problem
+    caused by slow/stopping vehicles whose YOLO box jitters.
+  - Velocity prediction is clamped to zero for near-stationary tracks so
+    overshoot doesn't push the predicted position away from a stopped vehicle.
+  - _net_direction now checks whether the median x-delta is large enough to
+    be trustworthy; if not it falls back to net displacement.
+  - MIN_TRACK_FRAMES recommendation raised to 12 (set in config.py).
 """
 
 import math
@@ -16,31 +27,96 @@ from config import (
     MIN_TRACK_DISPLACEMENT_PX,
 )
 
+# Minimum IoU to force-match two detections regardless of centroid distance.
+# 0.15 is deliberately low — any meaningful box overlap counts.
+_IOU_MATCH_THRESHOLD = 0.15
+
+# If predicted velocity is below this (px/ms) treat the vehicle as stationary
+# and don't extrapolate its position.  At 15 fps a frame is ~67 ms, so
+# 0.05 px/ms ≈ 3 px/frame — pure jitter territory.
+_MIN_PREDICT_VELOCITY = 0.05
+
+# Minimum absolute median x-delta (px/frame) before we trust the
+# median-delta direction.  Below this the track is too slow/jittery and we
+# fall back to net displacement.
+_MIN_DIRECTION_DELTA = 2.0
+
+
+# ─── IoU helper ───────────────────────────────────────────────────────────────
+
+def _iou(box_a, box_b):
+    """
+    Intersection-over-Union for two boxes in (x, y, w, h) format.
+    Returns 0.0 if either box has zero area.
+    """
+    ax, ay, aw, ah = box_a
+    bx, by, bw, bh = box_b
+
+    ix = max(ax, bx)
+    iy = max(ay, by)
+    ix2 = min(ax + aw, bx + bw)
+    iy2 = min(ay + ah, by + bh)
+
+    inter_w = max(0, ix2 - ix)
+    inter_h = max(0, iy2 - iy)
+    inter   = inter_w * inter_h
+
+    area_a = aw * ah
+    area_b = bw * bh
+    union  = area_a + area_b - inter
+
+    if union <= 0:
+        return 0.0
+    return inter / union
+
+
+# ─── Centroid Tracker ─────────────────────────────────────────────────────────
+
 class CentroidTracker:
     """
-    Assigns persistent IDs to blobs across frames.
-    Uses velocity prediction so fast vehicles are matched correctly
-    even when they move a large distance between frames.
-    Dropout is time-based so uneven framerates don't break tracks.
+    Assigns persistent IDs to detections across frames.
+
+    Matching strategy (in order of priority):
+      1. If boxes are provided and two detections have IoU >= _IOU_MATCH_THRESHOLD,
+         match them regardless of centroid distance.
+      2. Otherwise use predicted centroid distance with MAX_TRACKER_DISTANCE gate.
+
+    Velocity prediction is suppressed for near-stationary tracks to prevent
+    overshoot from pushing a stopped vehicle's predicted position away from
+    where it actually is.
     """
 
     def __init__(self):
         self.next_id      = 0
         self.objects      = {}   # id → (cx, cy)
+        self.boxes        = {}   # id → (x, y, w, h) — may be None
         self.velocities   = {}   # id → (vx, vy) px/ms
         self.last_seen_ms = {}   # id → timestamp_ms
 
-    def register(self, centroid, ts):
+    def register(self, centroid, ts, box=None):
         self.objects[self.next_id]      = centroid
+        self.boxes[self.next_id]        = box
         self.velocities[self.next_id]   = (0.0, 0.0)
         self.last_seen_ms[self.next_id] = ts
         self.next_id += 1
 
     def deregister(self, oid):
-        for d in (self.objects, self.velocities, self.last_seen_ms):
+        for d in (self.objects, self.boxes, self.velocities, self.last_seen_ms):
             d.pop(oid, None)
 
-    def update(self, centroids, ts):
+    def update(self, centroids, ts, boxes=None):
+        """
+        Parameters
+        ----------
+        centroids : list of (cx, cy)
+        ts        : current timestamp in ms
+        boxes     : optional list of (x, y, w, h), same length as centroids.
+                    Pass None or omit to use centroid-only matching.
+        """
+        # Normalise boxes list
+        if boxes is None or len(boxes) != len(centroids):
+            boxes = [None] * len(centroids)
+
         # Drop timed-out tracks
         for oid in list(self.last_seen_ms):
             if ts - self.last_seen_ms[oid] > MAX_DISAPPEARED_MS:
@@ -50,8 +126,8 @@ class CentroidTracker:
             return dict(self.objects)
 
         if not self.objects:
-            for c in centroids:
-                self.register(c, ts)
+            for c, b in zip(centroids, boxes):
+                self.register(c, ts, b)
             return dict(self.objects)
 
         oids = list(self.objects.keys())
@@ -59,43 +135,76 @@ class CentroidTracker:
         # Predict where each tracked object will be this frame
         predicted = []
         for oid in oids:
-            cx, cy = self.objects[oid]
-            vx, vy = self.velocities[oid]
-            dt = ts - self.last_seen_ms[oid]
-            predicted.append((cx + vx * dt, cy + vy * dt))
+            cx, cy   = self.objects[oid]
+            vx, vy   = self.velocities[oid]
+            dt       = ts - self.last_seen_ms[oid]
+            speed    = math.hypot(vx, vy)
+            if speed >= _MIN_PREDICT_VELOCITY:
+                predicted.append((cx + vx * dt, cy + vy * dt))
+            else:
+                # Vehicle was near-stationary — don't extrapolate
+                predicted.append((cx, cy))
 
-        # Build distance matrix between predictions and new detections
-        D = np.zeros((len(predicted), len(centroids)))
+        # ── Build matching matrices ───────────────────────────────────────────
+
+        n_tracked = len(oids)
+        n_new     = len(centroids)
+
+        # Centroid-distance matrix (predicted positions vs new detections)
+        D = np.full((n_tracked, n_new), np.inf)
         for i, (px, py) in enumerate(predicted):
             for j, (nx, ny) in enumerate(centroids):
                 D[i, j] = math.hypot(px - nx, py - ny)
 
-        # Greedy matching: closest pair first
-        rows = D.min(axis=1).argsort()
-        cols = D.argmin(axis=1)[rows]
-        used_r, used_c = set(), set()
+        # IoU matrix (last known box vs new box) — only populated when both exist
+        IOU = np.zeros((n_tracked, n_new))
+        for i, oid in enumerate(oids):
+            if self.boxes[oid] is None:
+                continue
+            for j, nb in enumerate(boxes):
+                if nb is None:
+                    continue
+                IOU[i, j] = _iou(self.boxes[oid], nb)
 
-        for r, c in zip(rows, cols):
+        # ── Greedy matching ───────────────────────────────────────────────────
+        # Build a combined priority score.  IoU matches get priority (negative
+        # score so they sort first); distance matches are secondary.
+        scores = []
+        for i in range(n_tracked):
+            for j in range(n_new):
+                iou_val  = IOU[i, j]
+                dist_val = D[i, j]
+                if iou_val >= _IOU_MATCH_THRESHOLD:
+                    # Force-match: score < 0 so it sorts before any distance match
+                    scores.append((-iou_val, i, j, "iou"))
+                elif dist_val <= MAX_TRACKER_DISTANCE:
+                    scores.append((dist_val, i, j, "dist"))
+
+        scores.sort(key=lambda x: x[0])
+
+        used_r, used_c = set(), set()
+        for score_val, r, c, match_type in scores:
             if r in used_r or c in used_c:
                 continue
-            if D[r, c] > MAX_TRACKER_DISTANCE:
-                continue
-            oid = oids[r]
+            oid  = oids[r]
             pcx, pcy = self.objects[oid]
             ncx, ncy = centroids[c]
-            dt = max(ts - self.last_seen_ms[oid], 1)
+            dt   = max(ts - self.last_seen_ms[oid], 1)
             self.velocities[oid]   = ((ncx - pcx) / dt, (ncy - pcy) / dt)
             self.objects[oid]      = centroids[c]
+            self.boxes[oid]        = boxes[c]
             self.last_seen_ms[oid] = ts
             used_r.add(r)
             used_c.add(c)
 
-        # Register new blobs that weren't matched
-        for c in set(range(len(centroids))) - used_c:
-            self.register(centroids[c], ts)
+        # Register new detections that weren't matched to any existing track
+        for c in set(range(n_new)) - used_c:
+            self.register(centroids[c], ts, boxes[c])
 
         return dict(self.objects)
 
+
+# ─── Vehicle Tracker ──────────────────────────────────────────────────────────
 
 class VehicleTracker:
     """
@@ -118,8 +227,20 @@ class VehicleTracker:
         self.vehicles   = []
         self.finalised  = set()
 
-    def update(self, centroids, ts, directions=None, classes=None, confs=None):
-        objects    = self.ct.update(centroids, ts)
+    def update(self, centroids, ts, directions=None, classes=None,
+               confs=None, boxes=None):
+        """
+        Parameters
+        ----------
+        centroids  : list of (cx, cy)
+        ts         : timestamp in ms
+        directions : optional list of direction strings
+        classes    : optional list of class label strings
+        confs      : optional list of float confidences
+        boxes      : optional list of (x, y, w, h) — passed to CentroidTracker
+                     for IoU-assisted matching
+        """
+        objects    = self.ct.update(centroids, ts, boxes=boxes)
         active_ids = set(objects.keys())
 
         if directions or classes or confs:
@@ -175,17 +296,34 @@ class VehicleTracker:
     def _net_direction(self, path):
         """
         Determine direction of travel from the median x-delta across the
-        first 80% of track points. Ignoring the tail avoids direction flips
-        caused by a merging vehicle at the end of the track.
+        first 80% of track points.
+
+        If the median delta is too small to be trusted (slow or stationary
+        vehicle, jitter-dominated track) fall back to net x-displacement.
+        This prevents noise flipping the direction label on slow vehicles.
         """
         pts = list(path)
         if len(pts) < 2:
             return "right" if pts[-1][0] > pts[0][0] else "left"
+
         # Use first 80% of points to avoid end-of-track merge contamination
-        cutoff = max(2, int(len(pts) * 0.8))
-        pts = pts[:cutoff]
+        cutoff  = max(2, int(len(pts) * 0.8))
+        pts     = pts[:cutoff]
         x_deltas = [pts[i][0] - pts[i-1][0] for i in range(1, len(pts))]
-        return "right" if np.median(x_deltas) > 0 else "left"
+        median_delta = float(np.median(x_deltas))
+
+        if abs(median_delta) >= _MIN_DIRECTION_DELTA:
+            # Median delta is large enough to be reliable
+            return "right" if median_delta > 0 else "left"
+
+        # Fall back: use total net displacement over the available points
+        total_dx = pts[-1][0] - pts[0][0]
+        if abs(total_dx) > 0:
+            return "right" if total_dx > 0 else "left"
+
+        # Last resort: use full path net displacement
+        full_pts = list(path)
+        return "right" if full_pts[-1][0] >= full_pts[0][0] else "left"
 
     def _finalise(self, oid):
         self.finalised.add(oid)
@@ -210,7 +348,9 @@ class VehicleTracker:
         # movement, trust the movement.
         net_dir   = self._net_direction(path)
         det_dir   = self.directions.get(oid)
-        direction = net_dir if (not det_dir or det_dir == "unknown" or det_dir != net_dir) else det_dir
+        direction = (net_dir
+                     if (not det_dir or det_dir == "unknown" or det_dir != net_dir)
+                     else det_dir)
 
         # Final speed from middle portion of track (avoids edge distortion)
         n    = len(path)
