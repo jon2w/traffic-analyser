@@ -325,6 +325,54 @@ def api_stats():
         return jsonify({"error": str(e)})
 
 
+
+
+@app.route("/api/frame")
+def api_frame():
+    """Extract a single frame from a video as JPEG."""
+    path     = request.args.get("path", "")
+    frame_idx = int(request.args.get("frame", 0))
+    if not path or not os.path.exists(path):
+        return "Not found", 404
+    import cv2, io
+    cap = cv2.VideoCapture(path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok:
+        return "Could not read frame", 500
+    ok2, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not ok2:
+        return "Encode failed", 500
+    return Response(buf.tobytes(), mimetype="image/jpeg")
+
+
+@app.route("/api/zones", methods=["GET"])
+def api_zones_get():
+    """Read zones.json."""
+    zones_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zones.json")
+    if not os.path.exists(zones_path):
+        return jsonify({"zones": []})
+    try:
+        with open(zones_path, encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"error": str(e), "zones": []})
+
+
+@app.route("/api/zones", methods=["POST"])
+def api_zones_post():
+    """Write zones.json."""
+    zones_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zones.json")
+    try:
+        data = request.json
+        with open(zones_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

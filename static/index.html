@@ -22,392 +22,145 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text);
     font-family: 'Syne', sans-serif;
-    min-height: 100vh;
-    display: grid;
-    grid-template-rows: auto 1fr;
+    min-height: 100vh; display: grid; grid-template-rows: auto 1fr;
   }
 
   header {
-    border-bottom: 1px solid var(--border);
-    padding: 1.2rem 2rem;
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    background: var(--surface);
+    border-bottom: 1px solid var(--border); padding: 1.2rem 2rem;
+    display: flex; align-items: center; gap: 1.5rem; background: var(--surface);
   }
-
-  header h1 {
-    font-size: 1.3rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: #fff;
-  }
-
+  header h1 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; color: #fff; }
   header h1 span { color: var(--accent); }
 
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    transition: background 0.3s;
-  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
   .status-dot.running { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
-
   .status-label { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--muted); }
 
-  nav {
-    display: flex;
-    gap: 0;
-    margin-left: auto;
-  }
-
+  nav { display: flex; gap: 0; margin-left: auto; }
   nav button {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    padding: 0.5rem 1.1rem;
-    cursor: pointer;
-    transition: all 0.15s;
-    border-right: none;
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    padding: 0.5rem 1.1rem; cursor: pointer; transition: all 0.15s; border-right: none;
   }
   nav button:last-child { border-right: 1px solid var(--border); }
   nav button:first-child { border-radius: 4px 0 0 4px; }
   nav button:last-child { border-radius: 0 4px 4px 0; }
-  nav button.active, nav button:hover {
-    background: var(--accent);
-    color: #000;
-    border-color: var(--accent);
-  }
+  nav button.active, nav button:hover { background: var(--accent); color: #000; border-color: var(--accent); }
 
-  main {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    height: calc(100vh - 61px);
-    overflow: hidden;
-  }
+  main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 61px); overflow: hidden; }
 
-  /* ── Sidebar ── */
-  .sidebar {
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .sidebar-head {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.7rem;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .file-tree {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem 0;
-  }
-
+  .sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-head { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .file-tree { flex: 1; overflow-y: auto; padding: 0.5rem 0; }
   .file-tree::-webkit-scrollbar { width: 4px; }
-  .file-tree::-webkit-scrollbar-track { background: transparent; }
   .file-tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  .date-group { }
-  .date-header {
-    padding: 0.4rem 1rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--accent);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    user-select: none;
-  }
+  .date-header { padding: 0.4rem 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--accent); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; user-select: none; }
   .date-header:hover { background: var(--border); }
   .date-header .chevron { transition: transform 0.2s; font-size: 0.6rem; }
   .date-header.collapsed .chevron { transform: rotate(-90deg); }
-
   .file-list { display: flex; flex-direction: column; }
   .date-group.collapsed .file-list { display: none; }
 
-  .file-item {
-    padding: 0.35rem 1rem 0.35rem 2rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: background 0.1s;
-    color: var(--text);
-  }
+  .file-item { padding: 0.35rem 1rem 0.35rem 2rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.1s; color: var(--text); }
   .file-item:hover { background: var(--border); }
   .file-item.selected { background: rgba(0,229,255,0.1); color: var(--accent); }
-  .file-item .dot {
-    width: 5px; height: 5px; border-radius: 50%;
-    background: var(--muted); flex-shrink: 0;
-  }
+  .file-item .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
   .file-item.processed .dot { background: var(--green); }
   .file-item.night { color: #9b8bff; }
 
-  /* ── Content panels ── */
-  .panel {
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    height: 100%;
-  }
+  .panel { display: none; flex-direction: column; overflow: hidden; height: 100%; }
   .panel.active { display: flex; }
 
-  .panel-head {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-shrink: 0;
-  }
+  .panel-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+  .panel-head h2 { font-size: 0.85rem; font-weight: 600; color: #fff; flex: 1; }
+  .panel-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
 
-  .panel-head h2 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #fff;
-    flex: 1;
-  }
-
-  .panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1.5rem;
-  }
-
-  /* ── Buttons ── */
-  .btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    padding: 0.5rem 1.2rem;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-  }
+  .btn { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 0.5rem 1.2rem; border: none; border-radius: 3px; cursor: pointer; transition: all 0.15s; font-weight: 600; letter-spacing: 0.05em; }
   .btn-primary { background: var(--accent); color: #000; }
   .btn-primary:hover { background: #33ecff; }
   .btn-danger  { background: var(--red); color: #fff; }
-  .btn-danger:hover { filter: brightness(1.2); }
   .btn-ghost   { background: transparent; border: 1px solid var(--border); color: var(--text); }
   .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* ── File detail ── */
-  .file-meta {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-  .meta-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-  }
-  .meta-card .label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 0.25rem;
-  }
-  .meta-card .value {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #fff;
-  }
+  .file-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .meta-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem; }
+  .meta-card .label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem; }
+  .meta-card .value { font-size: 0.9rem; font-weight: 600; color: #fff; }
 
-  .action-bar {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-  }
-
-  .mode-toggle {
-    display: flex;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .mode-toggle button {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    padding: 0.45rem 0.9rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
+  .mode-toggle { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .mode-toggle button { background: none; border: none; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; padding: 0.45rem 0.9rem; cursor: pointer; transition: all 0.15s; }
   .mode-toggle button.active { background: var(--accent2); color: #fff; }
 
-  /* ── Terminal ── */
-  .terminal {
-    background: #050709;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    line-height: 1.7;
-    min-height: 200px;
-    max-height: 350px;
-    overflow-y: auto;
-    color: #7ec8a0;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
+  .terminal { background: #050709; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.7; min-height: 200px; max-height: 350px; overflow-y: auto; color: #7ec8a0; white-space: pre-wrap; word-break: break-all; }
   .terminal::-webkit-scrollbar { width: 4px; }
   .terminal::-webkit-scrollbar-thumb { background: var(--border); }
   .terminal .err { color: var(--red); }
-  .terminal .info { color: var(--accent); }
 
-  /* ── Video player ── */
-  .video-wrap {
-    margin-top: 1.5rem;
-    background: #000;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-    display: none;
-  }
-  .video-wrap video { width: 100%; display: block; }
+  .video-wrap { margin-top: 1.5rem; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: none; padding: 0.5rem; }
 
-  /* ── Stats ── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1.25rem;
-    position: relative;
-    overflow: hidden;
-  }
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--accent);
-  }
-  .stat-card .num {
-    font-size: 2rem;
-    font-weight: 800;
-    color: #fff;
-    line-height: 1;
-    margin-bottom: 0.4rem;
-  }
-  .stat-card .lbl {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; position: relative; overflow: hidden; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
+  .stat-card .num { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 0.4rem; }
+  .stat-card .lbl { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 
-  .section-title {
-    font-size: 0.7rem;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
-  }
+  .section-title { font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-  }
-  th {
-    text-align: left;
-    padding: 0.5rem 0.75rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.65rem;
-    border-bottom: 1px solid var(--border);
-  }
-  td {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(30,37,48,0.5);
-    color: var(--text);
-  }
+  table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+  th { text-align: left; padding: 0.5rem 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.65rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(30,37,48,0.5); color: var(--text); }
   tr:hover td { background: var(--surface); }
 
-  /* ── Batch panel ── */
-  .batch-form {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-  .form-group label {
-    display: block;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 0.4rem;
-  }
-  .form-group input, .form-group select {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 3px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
+  .batch-form { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .form-group label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+  .form-group input, .form-group select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 3px; outline: none; transition: border-color 0.15s; }
   .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
   .batch-actions { grid-column: 1 / -1; display: flex; gap: 0.75rem; align-items: center; }
 
-  .empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
-  }
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
   .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+
+  /* ── Zone editor ─────────────────────────────────────────────────────────── */
+  #panel-zones { flex-direction: row !important; }
+
+  .zone-canvas-area {
+    flex: 1; position: relative; background: #000;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  #zoneCanvas { max-width: 100%; max-height: 100%; cursor: crosshair; display: block; }
+  #zoneFrameMsg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--muted); text-align: center; line-height: 1.8; pointer-events: none; }
+
+  .zone-right-panel { width: 280px; border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+
+  .zone-scrubber { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .zone-scrubber input[type=range] { flex: 1; accent-color: var(--accent); }
+  .zone-scrubber span { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--muted); white-space: nowrap; }
+
+  .zone-panel-head { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .zone-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+  .zone-card { border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.4rem; cursor: pointer; transition: all 0.15s; position: relative; }
+  .zone-card:hover { border-color: var(--muted); }
+  .zone-card.active { border-color: var(--accent); background: rgba(0,229,255,0.05); }
+  .zone-card-name { font-weight: 600; font-size: 0.82rem; color: #fff; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
+  .zone-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .zone-card-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.63rem; color: var(--muted); }
+  .zone-del-btn { position: absolute; top: 0.4rem; right: 0.4rem; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.75rem; padding: 0.15rem 0.35rem; border-radius: 3px; line-height: 1; transition: all 0.15s; }
+  .zone-del-btn:hover { background: var(--red); color: #fff; }
+
+  .zone-props { padding: 0.75rem; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .zone-props .form-group { margin-bottom: 0.6rem; }
+  .zone-props .form-group:last-child { margin-bottom: 0; }
+  .ppm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+  .zone-hint { padding: 0.6rem 0.75rem; margin: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: var(--muted); line-height: 1.7; flex-shrink: 0; }
+
+  .zone-footer { padding: 0.75rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -419,62 +172,52 @@
     <span class="status-label" id="statusLabel">IDLE</span>
   </div>
   <nav>
-    <button class="active" onclick="showTab('browse')">Browse</button>
-    <button onclick="showTab('batch')">Batch</button>
-    <button onclick="showTab('stats')">Stats</button>
+    <button class="active" onclick="showTab('browse',this)">Browse</button>
+    <button onclick="showTab('batch',this)">Batch</button>
+    <button onclick="showTab('zones',this)">Zones</button>
+    <button onclick="showTab('stats',this)">Stats</button>
   </nav>
 </header>
 
 <main>
-  <!-- Sidebar: file browser -->
   <aside class="sidebar">
     <div class="sidebar-head">Recordings &nbsp;<span id="fileCount" style="color:var(--accent)"></span></div>
     <div class="file-tree" id="fileTree">
-      <div class="empty-state"><div class="icon">📁</div>Loading...</div>
+      <div class="empty-state"><div class="icon">&#128193;</div>Loading...</div>
     </div>
   </aside>
 
-  <!-- Browse panel -->
+  <!-- Browse -->
   <section class="panel active" id="panel-browse">
     <div class="panel-head">
       <h2 id="selectedFile">Select a recording</h2>
       <div class="mode-toggle">
         <button class="active" onclick="setMode('auto')" id="modeAuto">AUTO</button>
-        <button onclick="setMode('day')"  id="modeDay">DAY</button>
+        <button onclick="setMode('day')" id="modeDay">DAY</button>
         <button onclick="setMode('night')" id="modeNight">NIGHT</button>
       </div>
-      <button class="btn btn-primary" id="btnAnalyse" onclick="runAnalyse()" disabled>▶ Analyse</button>
-      <button class="btn btn-danger"  id="btnStop"    onclick="stopJob()"    style="display:none">■ Stop</button>
+      <button class="btn btn-primary" id="btnAnalyse" onclick="runAnalyse()" disabled>&#9654; Analyse</button>
+      <button class="btn btn-danger" id="btnStop" onclick="stopJob()" style="display:none">&#9632; Stop</button>
     </div>
     <div class="panel-body">
       <div id="fileMeta" class="file-meta" style="display:none"></div>
-      <div class="terminal" id="terminal">// Select a file and click Analyse&#10;</div>
-      <div class="video-wrap" id="videoWrap">
-        <video id="videoPlayer" controls></video>
-      </div>
+      <div class="terminal" id="terminal">// Select a file and click Analyse
+</div>
+      <div class="video-wrap" id="videoWrap"></div>
     </div>
   </section>
 
-  <!-- Batch panel -->
+  <!-- Batch -->
   <section class="panel" id="panel-batch">
     <div class="panel-head">
       <h2>Batch Processing</h2>
-      <button class="btn btn-danger" id="btnBatchStop" onclick="stopJob()" style="display:none">■ Stop</button>
+      <button class="btn btn-danger" id="btnBatchStop" onclick="stopJob()" style="display:none">&#9632; Stop</button>
     </div>
     <div class="panel-body">
       <div class="batch-form">
-        <div class="form-group">
-          <label>Since date (optional)</label>
-          <input type="date" id="batchSince">
-        </div>
-        <div class="form-group">
-          <label>Camera (optional)</label>
-          <input type="text" id="batchCamera" placeholder="Camera1">
-        </div>
-        <div class="form-group">
-          <label>Limit (optional)</label>
-          <input type="number" id="batchLimit" placeholder="e.g. 100">
-        </div>
+        <div class="form-group"><label>Since date</label><input type="date" id="batchSince"></div>
+        <div class="form-group"><label>Camera</label><input type="text" id="batchCamera" placeholder="Camera1"></div>
+        <div class="form-group"><label>Limit</label><input type="number" id="batchLimit" placeholder="e.g. 100"></div>
         <div class="form-group">
           <label>Mode</label>
           <select id="batchMode">
@@ -484,67 +227,113 @@
           </select>
         </div>
         <div class="batch-actions">
-          <button class="btn btn-ghost"    id="btnDryRun"  onclick="runBatch(true)">🔍 Dry Run</button>
-          <button class="btn btn-primary"  id="btnBatch"   onclick="runBatch(false)">▶ Run Batch</button>
-          <button class="btn btn-ghost"    onclick="runBatch(false, true)">⚡ Force Reprocess</button>
+          <button class="btn btn-ghost" id="btnDryRun" onclick="runBatch(true)">&#128269; Dry Run</button>
+          <button class="btn btn-primary" id="btnBatch" onclick="runBatch(false)">&#9654; Run Batch</button>
+          <button class="btn btn-ghost" onclick="runBatch(false,true)">&#9889; Force Reprocess</button>
         </div>
       </div>
-      <div class="terminal" id="batchTerminal">// Configure options above and click Run Batch&#10;</div>
+      <div class="terminal" id="batchTerminal">// Configure options above and click Run Batch
+</div>
     </div>
   </section>
 
-  <!-- Stats panel -->
+  <!-- Zones -->
+  <section class="panel" id="panel-zones">
+    <div class="zone-canvas-area">
+      <div id="zoneFrameMsg">Select a recording from the sidebar,<br>then switch to the Zones tab.<br><br>Use the scrubber to pick a reference frame.<br>Click canvas to add points &bull; click near a point to delete it.</div>
+      <canvas id="zoneCanvas"></canvas>
+    </div>
+    <div class="zone-right-panel">
+      <div class="zone-panel-head">
+        Zones
+        <button class="btn btn-ghost" style="margin-left:auto;padding:0.2rem 0.6rem;font-size:0.65rem" onclick="addZone()">+ New</button>
+      </div>
+      <div class="zone-scrubber" id="zoneScrubber" style="display:none">
+        <span>Frame</span>
+        <input type="range" id="frameSlider" min="0" max="100" value="10" oninput="scrubFrame(this.value)">
+        <span id="frameLabel">0s</span>
+      </div>
+      <div class="zone-list" id="zoneList"></div>
+      <div class="zone-props" id="zoneProps" style="display:none">
+        <div class="section-title" style="margin-bottom:0.6rem">Selected Zone</div>
+        <div class="form-group"><label>Name</label><input type="text" id="zpName" oninput="updateZoneProp('name',this.value)"></div>
+        <div class="form-group">
+          <label>Type</label>
+          <select id="zpType" onchange="updateZoneProp('type',this.value)">
+            <option value="side_on">side_on (speed)</option>
+            <option value="end_on">end_on (count only)</option>
+          </select>
+        </div>
+        <div id="zpPpmRow" class="ppm-row">
+          <div class="form-group"><label>PPM Left</label><input type="number" id="zpPpmLeft" step="0.1" oninput="updateZoneProp('ppm_left',parseFloat(this.value))"></div>
+          <div class="form-group"><label>PPM Right</label><input type="number" id="zpPpmRight" step="0.1" oninput="updateZoneProp('ppm_right',parseFloat(this.value))"></div>
+        </div>
+        <div style="margin-top:0.4rem;font-family:'JetBrains Mono',monospace;font-size:0.63rem;color:var(--muted)" id="zpPointCount"></div>
+      </div>
+      <div class="zone-hint">
+        <b>Click canvas</b> &rarr; add point<br>
+        <b>Click near point</b> &rarr; delete it<br>
+        <b>Click zone card</b> &rarr; switch zone<br>
+        Save writes zones.json to NAS
+      </div>
+      <div class="zone-footer">
+        <button class="btn btn-ghost" onclick="clearZonePoints()" style="width:100%">&#10006; Clear Points</button>
+        <button class="btn btn-primary" onclick="saveZones()" style="width:100%">&#128190; Save zones.json</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
   <section class="panel" id="panel-stats">
     <div class="panel-head">
       <h2>Database Summary</h2>
-      <button class="btn btn-ghost" onclick="loadStats()">↻ Refresh</button>
+      <button class="btn btn-ghost" onclick="loadStats()">&#8635; Refresh</button>
     </div>
     <div class="panel-body" id="statsBody">
-      <div class="empty-state"><div class="icon">📊</div>Loading stats...</div>
+      <div class="empty-state"><div class="icon">&#128202;</div>Loading stats...</div>
     </div>
   </section>
 </main>
 
 <script>
-let selectedPath = null;
-let mode = 'auto';
-let eventSource = null;
+let selectedPath   = null;
+let mode           = 'auto';
+let eventSource    = null;
 let processedFiles = new Set();
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
-function showTab(tab) {
+function showTab(tab, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
-  event.target.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (tab === 'stats') loadStats();
+  if (tab === 'zones') initZoneEditor();
 }
 
-// ── Mode selector ─────────────────────────────────────────────────────────────
+// ── Mode ──────────────────────────────────────────────────────────────────────
 function setMode(m) {
   mode = m;
-  ['Auto','Day','Night'].forEach(x =>
-    document.getElementById('mode'+x).classList.remove('active'));
+  ['Auto','Day','Night'].forEach(x => document.getElementById('mode'+x).classList.remove('active'));
   document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1)).classList.add('active');
 }
 
 // ── File tree ─────────────────────────────────────────────────────────────────
 async function loadFileTree() {
-  const res = await fetch('/api/recordings');
+  const res  = await fetch('/api/recordings');
   const data = await res.json();
   processedFiles = new Set(data.processed);
-  const tree = document.getElementById('fileTree');
+  const tree  = document.getElementById('fileTree');
   const count = document.getElementById('fileCount');
-
   let total = 0;
   tree.innerHTML = '';
 
   for (const [dateDir, files] of Object.entries(data.tree)) {
     const dayCount = files.length;
     total += dayCount;
-    const grpDiv = document.createElement('div');
-    grpDiv.className = 'date-group';
-    grpDiv.id = 'grp-' + dateDir;
+    const grp = document.createElement('div');
+    grp.className = 'date-group';
+    grp.id = 'grp-' + dateDir;
     const hdr = document.createElement('div');
     hdr.className = 'date-header';
     hdr.dataset.date = dateDir;
@@ -558,65 +347,57 @@ async function loadFileTree() {
       el.dataset.path  = f.path;
       el.dataset.label = f.label;
       el.dataset.date  = dateDir;
-      el.onclick = function() { selectFile(this.dataset.path, this.dataset.label, this.dataset.date); };
+      el.onclick = function() { selectFile(this.dataset.path, this.dataset.label); };
       el.innerHTML = '<div class="dot"></div>' + f.label;
       list.appendChild(el);
     }
-    grpDiv.appendChild(hdr);
-    grpDiv.appendChild(list);
-    tree.appendChild(grpDiv);
+    grp.appendChild(hdr);
+    grp.appendChild(list);
+    tree.appendChild(grp);
   }
-
-    if (!total) tree.innerHTML = '<div class="empty-state">No recordings found</div>';
+  if (!total) tree.innerHTML = '<div class="empty-state">No recordings found</div>';
   count.textContent = total;
 }
 
 function toggleGroup(dateDir) {
   const grp = document.getElementById('grp-' + dateDir);
-  const hdr = grp.querySelector('.date-header');
   grp.classList.toggle('collapsed');
-  hdr.classList.toggle('collapsed');
+  grp.querySelector('.date-header').classList.toggle('collapsed');
 }
 
-async function selectFile(path, label, dateDir) {
+async function selectFile(path, label) {
   selectedPath = path;
   document.querySelectorAll('.file-item').forEach(el => el.classList.remove('selected'));
   event.currentTarget.classList.add('selected');
-  document.getElementById('selectedFile').textContent = label;
+  document.getElementById('selectedFile').textContent = label || path.split('/').pop();
   document.getElementById('btnAnalyse').disabled = false;
   document.getElementById('videoWrap').style.display = 'none';
-  document.getElementById('terminal').textContent = '// Ready — click Analyse to process\n';
+  document.getElementById('terminal').textContent = '// Ready \u2014 click Analyse to process\n';
 
-  // Show metadata
   const res  = await fetch('/api/file_info?path=' + encodeURIComponent(path));
   const info = await res.json();
   const meta = document.getElementById('fileMeta');
   meta.style.display = 'grid';
-  meta.innerHTML = `
-    <div class="meta-card"><div class="label">Date / Time</div><div class="value">${info.recorded_at}</div></div>
-    <div class="meta-card"><div class="label">Duration</div><div class="value">${info.duration}</div></div>
-    <div class="meta-card"><div class="label">Resolution</div><div class="value">${info.resolution}</div></div>
-    <div class="meta-card"><div class="label">In Database</div><div class="value" style="color:${info.processed ? 'var(--green)' : 'var(--muted)'}">${info.processed ? 'YES' : 'NO'}</div></div>
-  `;
+  meta.innerHTML =
+    '<div class="meta-card"><div class="label">Date / Time</div><div class="value">' + info.recorded_at + '</div></div>' +
+    '<div class="meta-card"><div class="label">Duration</div><div class="value">' + info.duration + '</div></div>' +
+    '<div class="meta-card"><div class="label">Resolution</div><div class="value">' + info.resolution + '</div></div>' +
+    '<div class="meta-card"><div class="label">In Database</div><div class="value" style="color:' + (info.processed ? 'var(--green)' : 'var(--muted)') + '">' + (info.processed ? 'YES' : 'NO') + '</div></div>';
+
+  // Auto-load frame if zones tab is active
+  if (document.getElementById('panel-zones').classList.contains('active')) {
+    zoneLoadVideoInfo(path);
+  }
 }
 
 // ── Job control ───────────────────────────────────────────────────────────────
 function setRunning(running) {
-  const dot   = document.getElementById('statusDot');
-  const lbl   = document.getElementById('statusLabel');
-  const btnA  = document.getElementById('btnAnalyse');
-  const btnS  = document.getElementById('btnStop');
-  const btnB  = document.getElementById('btnBatch');
-  const btnBS = document.getElementById('btnBatchStop');
-  const btnDR = document.getElementById('btnDryRun');
-
-  dot.className  = 'status-dot' + (running ? ' running' : '');
-  lbl.textContent = running ? 'RUNNING' : 'IDLE';
-  if (btnA)  btnA.disabled    = running;
-  if (btnS)  btnS.style.display  = running ? 'inline-block' : 'none';
-  if (btnB)  btnB.disabled    = running;
-  if (btnDR) btnDR.disabled   = running;
-  if (btnBS) btnBS.style.display = running ? 'inline-block' : 'none';
+  document.getElementById('statusDot').className = 'status-dot' + (running ? ' running' : '');
+  document.getElementById('statusLabel').textContent = running ? 'RUNNING' : 'IDLE';
+  const ids = ['btnAnalyse','btnBatch','btnDryRun'];
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = running; });
+  const stops = ['btnStop','btnBatchStop'];
+  stops.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = running ? 'inline-block' : 'none'; });
 }
 
 function appendLog(termId, text, cls) {
@@ -633,22 +414,19 @@ function runAnalyse() {
   document.getElementById('terminal').textContent = '';
   document.getElementById('videoWrap').style.display = 'none';
   setRunning(true);
-
   fetch('/api/analyse', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ path: selectedPath, mode: mode })
-  }).then(r => r.json()).then(data => {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({path: selectedPath, mode: mode})
+  }).then(r=>r.json()).then(data => {
     if (data.error) { appendLog('terminal', data.error, 'err'); setRunning(false); return; }
     streamLog('terminal', data.stream_url, () => {
       setRunning(false);
       loadFileTree();
-      // Show annotated video if produced
-      fetch('/api/job_output').then(r => r.json()).then(out => {
+      fetch('/api/job_output').then(r=>r.json()).then(out => {
         if (out.path) {
           const wrap = document.getElementById('videoWrap');
           wrap.style.display = 'block';
-          wrap.innerHTML = '<a class="btn btn-ghost" style="display:inline-block;margin:1rem" href="/api/video?path=' + encodeURIComponent(out.path) + '" download>⬇ Download annotated video</a><p style="font-family:monospace;font-size:0.7rem;color:var(--muted);padding:0 1rem 1rem">' + out.path + '</p>';
+          wrap.innerHTML = '<a class="btn btn-ghost" style="display:inline-block;margin:0.5rem" href="/api/video?path=' + encodeURIComponent(out.path) + '" download>\u2b07 Download annotated video</a><p style="font-family:monospace;font-size:0.65rem;color:var(--muted);padding:0 0.75rem 0.75rem">' + out.path + '</p>';
         }
       });
     });
@@ -656,26 +434,24 @@ function runAnalyse() {
 }
 
 function runBatch(dryRun, force) {
-  const since  = document.getElementById('batchSince').value;
-  const camera = document.getElementById('batchCamera').value;
-  const limit  = document.getElementById('batchLimit').value;
-  const bmode  = document.getElementById('batchMode').value;
   document.getElementById('batchTerminal').textContent = '';
   setRunning(true);
-
   fetch('/api/batch', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ since, camera, limit, mode: bmode, dry_run: !!dryRun, force: !!force })
-  }).then(r => r.json()).then(data => {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      since:   document.getElementById('batchSince').value,
+      camera:  document.getElementById('batchCamera').value,
+      limit:   document.getElementById('batchLimit').value,
+      mode:    document.getElementById('batchMode').value,
+      dry_run: !!dryRun, force: !!force
+    })
+  }).then(r=>r.json()).then(data => {
     if (data.error) { appendLog('batchTerminal', data.error, 'err'); setRunning(false); return; }
     streamLog('batchTerminal', data.stream_url, () => { setRunning(false); loadFileTree(); });
   });
 }
 
-function stopJob() {
-  fetch('/api/stop', { method: 'POST' });
-}
+function stopJob() { fetch('/api/stop', {method:'POST'}); }
 
 function streamLog(termId, url, onDone) {
   if (eventSource) eventSource.close();
@@ -693,40 +469,293 @@ async function loadStats() {
   const res  = await fetch('/api/stats');
   const data = await res.json();
   const body = document.getElementById('statsBody');
+  if (data.error) { body.innerHTML = '<div class="empty-state">' + data.error + '</div>'; return; }
+  const s      = data.summary;
+  const avgSpd = s.avg_speed ? parseFloat(s.avg_speed).toFixed(1) : '\u2014';
+  const maxSpd = s.max_speed ? parseFloat(s.max_speed).toFixed(1) : '\u2014';
+  let rows = '';
+  for (const r of data.recent) {
+    rows += '<tr><td>' + r.filename.split('/').slice(-2).join('/') + '</td><td>' + r.recorded_at + '</td><td>' + r.vehicle_count + '</td><td>' + (r.is_night ? 'Night' : 'Day') + '</td></tr>';
+  }
+  body.innerHTML =
+    '<div class="section-title">Last 7 days</div>' +
+    '<div class="stats-grid">' +
+      '<div class="stat-card"><div class="num">' + (s.total_vehicles||0) + '</div><div class="lbl">Vehicles</div></div>' +
+      '<div class="stat-card"><div class="num">' + avgSpd + '</div><div class="lbl">Avg km/h</div></div>' +
+      '<div class="stat-card"><div class="num">' + maxSpd + '</div><div class="lbl">Max km/h</div></div>' +
+      '<div class="stat-card"><div class="num">' + (s.going_right||0) + '</div><div class="lbl">Right</div></div>' +
+      '<div class="stat-card"><div class="num">' + (s.going_left||0) + '</div><div class="lbl">Left</div></div>' +
+      '<div class="stat-card"><div class="num">' + data.db_counts.recordings + '</div><div class="lbl">Recordings</div></div>' +
+    '</div>' +
+    '<div class="section-title">Recent recordings</div>' +
+    '<table><thead><tr><th>File</th><th>Date/Time</th><th>Vehicles</th><th>Mode</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
 
-  if (data.error) { body.innerHTML = `<div class="empty-state">${data.error}</div>`; return; }
+// ═══════════════════════════════════════════════════════════════════════════════
+// ZONE EDITOR
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  const s = data.summary;
-  const avgSpd = s.avg_speed ? parseFloat(s.avg_speed).toFixed(1) : '—';
-  const maxSpd = s.max_speed ? parseFloat(s.max_speed).toFixed(1) : '—';
+const ZONE_COLOURS  = ['#00e5ff','#ff6b35','#00ff88','#ff4444','#9b8bff','#ffd700','#ff69b4','#00bfff'];
+const POINT_HIT_PX  = 12;
 
-  body.innerHTML = `
-    <div class="section-title">Last 7 days</div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="num">${s.total_vehicles || 0}</div><div class="lbl">Vehicles</div></div>
-      <div class="stat-card"><div class="num">${avgSpd}</div><div class="lbl">Avg km/h</div></div>
-      <div class="stat-card"><div class="num">${maxSpd}</div><div class="lbl">Max km/h</div></div>
-      <div class="stat-card"><div class="num">${s.going_right || 0}</div><div class="lbl">→ Right</div></div>
-      <div class="stat-card"><div class="num">${s.going_left || 0}</div><div class="lbl">← Left</div></div>
-      <div class="stat-card"><div class="num">${data.db_counts.recordings}</div><div class="lbl">Recordings</div></div>
-    </div>
-    <div class="section-title">Recent recordings</div>
-    <table>
-      <thead><tr><th>File</th><th>Date/Time</th><th>Vehicles</th><th>Mode</th></tr></thead>
-      <tbody>
-        ${data.recent.map(r => '<tr><td>' + r.filename.split('/').slice(-2).join('/') + '</td><td>' + r.recorded_at + '</td><td>' + r.vehicle_count + '</td><td>' + (r.is_night ? '🌙 Night' : '☀️ Day') + '</td></tr>').join('')}
-      </tbody>
-    </table>
-  `;
+let zones         = [];
+let activeZoneIdx = 0;
+let frameImg      = null;
+let zoneVideoPath = null;
+let zoneVideoFps  = 10;
+let zoneFrames    = 0;
+let canvasScale   = 1;
+
+function initZoneEditor() {
+  loadZones();
+  if (selectedPath && zoneVideoPath !== selectedPath) {
+    zoneLoadVideoInfo(selectedPath);
+  }
+}
+
+async function loadZones() {
+  const res  = await fetch('/api/zones');
+  const data = await res.json();
+  zones = (data.zones || []).map(z => Object.assign({polygon:[]}, z));
+  if (activeZoneIdx >= zones.length) activeZoneIdx = 0;
+  renderZoneList();
+  drawCanvas();
+}
+
+async function zoneLoadVideoInfo(path) {
+  zoneVideoPath = path;
+  const res  = await fetch('/api/file_info?path=' + encodeURIComponent(path));
+  const info = await res.json();
+  zoneVideoFps = parseFloat(info.fps) || 10;
+  zoneFrames   = Math.round(parseFloat(info.duration) * zoneVideoFps);
+  const slider = document.getElementById('frameSlider');
+  slider.max   = Math.max(1, zoneFrames - 1);
+  slider.value = Math.round(zoneFrames * 0.1);
+  document.getElementById('zoneScrubber').style.display = 'flex';
+  scrubFrame(slider.value);
+}
+
+function scrubFrame(fi) {
+  document.getElementById('frameLabel').textContent = (fi / zoneVideoFps).toFixed(1) + 's';
+  if (zoneVideoPath) zoneLoadFrame(zoneVideoPath, parseInt(fi));
+}
+
+function zoneLoadFrame(path, frameIdx) {
+  document.getElementById('zoneFrameMsg').style.display = 'none';
+  const img = new Image();
+  img.onload = () => {
+    frameImg = img;
+    resizeCanvas();
+    drawCanvas();
+  };
+  img.src = '/api/frame?path=' + encodeURIComponent(path) + '&frame=' + frameIdx;
+}
+
+function resizeCanvas() {
+  if (!frameImg) return;
+  const canvas = document.getElementById('zoneCanvas');
+  const wrap   = canvas.parentElement;
+  const scale  = Math.min(wrap.clientWidth / frameImg.width, wrap.clientHeight / frameImg.height);
+  canvas.width  = Math.round(frameImg.width  * scale);
+  canvas.height = Math.round(frameImg.height * scale);
+  canvasScale   = scale;
+}
+
+function drawCanvas() {
+  const canvas = document.getElementById('zoneCanvas');
+  const ctx    = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (frameImg) {
+    ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  zones.forEach((zone, zi) => {
+    const pts    = zone.polygon || [];
+    if (pts.length === 0) return;
+    const colour = ZONE_COLOURS[zi % ZONE_COLOURS.length];
+    const active = zi === activeZoneIdx;
+
+    ctx.strokeStyle = colour;
+    ctx.lineWidth   = active ? 2.5 : 1.5;
+    ctx.globalAlpha = active ? 1.0 : 0.45;
+    ctx.setLineDash(active ? [] : [6,3]);
+
+    ctx.beginPath();
+    pts.forEach((p,i) => {
+      const x = p[0] * canvasScale, y = p[1] * canvasScale;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    if (pts.length > 2) ctx.closePath();
+    ctx.stroke();
+
+    if (pts.length > 2) {
+      ctx.fillStyle = colour;
+      ctx.globalAlpha = active ? 0.08 : 0.03;
+      ctx.fill();
+    }
+
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1.0;
+
+    // Points
+    pts.forEach((p, pi) => {
+      const x = p[0] * canvasScale, y = p[1] * canvasScale;
+      const r = active ? 8 : 5;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI*2);
+      ctx.fillStyle = active ? colour : '#555';
+      ctx.globalAlpha = active ? 1 : 0.6;
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      if (active) {
+        ctx.fillStyle = '#000';
+        ctx.globalAlpha = 1;
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pi + 1, x, y);
+      }
+    });
+    ctx.globalAlpha = 1;
+
+    // Label
+    if (pts.length > 0) {
+      const cx = pts.reduce((s,p)=>s+p[0],0)/pts.length*canvasScale;
+      const cy = pts.reduce((s,p)=>s+p[1],0)/pts.length*canvasScale;
+      ctx.font = 'bold 13px Syne,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = colour;
+      ctx.globalAlpha = active ? 1 : 0.55;
+      ctx.fillText(zone.name || ('Zone '+(zi+1)), cx, cy);
+      ctx.globalAlpha = 1;
+    }
+  });
+}
+
+document.getElementById('zoneCanvas').addEventListener('click', function(e) {
+  if (zones.length === 0) return;
+  const rect  = this.getBoundingClientRect();
+  const cx    = e.clientX - rect.left;
+  const cy    = e.clientY - rect.top;
+  const vx    = cx / canvasScale;
+  const vy    = cy / canvasScale;
+  const zone  = zones[activeZoneIdx];
+  if (!zone) return;
+  if (!zone.polygon) zone.polygon = [];
+  const pts   = zone.polygon;
+  const thresh = POINT_HIT_PX / canvasScale;
+
+  let delIdx = -1;
+  for (let i = 0; i < pts.length; i++) {
+    const dx = pts[i][0] - vx, dy = pts[i][1] - vy;
+    if (Math.sqrt(dx*dx+dy*dy) < thresh) { delIdx = i; break; }
+  }
+
+  if (delIdx >= 0) {
+    pts.splice(delIdx, 1);
+  } else {
+    pts.push([Math.round(vx), Math.round(vy)]);
+  }
+  renderZoneList();
+  drawCanvas();
+});
+
+window.addEventListener('resize', () => { resizeCanvas(); drawCanvas(); });
+
+function renderZoneList() {
+  const list = document.getElementById('zoneList');
+  list.innerHTML = '';
+  zones.forEach((zone, zi) => {
+    const colour = ZONE_COLOURS[zi % ZONE_COLOURS.length];
+    const card   = document.createElement('div');
+    card.className = 'zone-card' + (zi === activeZoneIdx ? ' active' : '');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'zone-del-btn';
+    delBtn.textContent = '\u2715';
+    delBtn.title = 'Delete zone';
+    delBtn.onclick = function(e) { e.stopPropagation(); deleteZone(zi); };
+    card.appendChild(delBtn);
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'zone-card-name';
+    nameDiv.innerHTML = '<div class="zone-color-dot" style="background:' + colour + '"></div>' + (zone.name || 'Zone '+(zi+1));
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'zone-card-meta';
+    metaDiv.textContent = zone.type + ' | ' + (zone.polygon||[]).length + ' pts';
+    card.appendChild(nameDiv);
+    card.appendChild(metaDiv);
+    card.onclick = function() { setActiveZone(zi); };
+    list.appendChild(card);
+  });
+
+  const props = document.getElementById('zoneProps');
+  if (zones.length > 0 && activeZoneIdx < zones.length) {
+    const z = zones[activeZoneIdx];
+    props.style.display = 'block';
+    document.getElementById('zpName').value     = z.name || '';
+    document.getElementById('zpType').value     = z.type || 'side_on';
+    document.getElementById('zpPpmLeft').value  = z.ppm_left  || '';
+    document.getElementById('zpPpmRight').value = z.ppm_right || '';
+    document.getElementById('zpPpmRow').style.display = (z.type === 'side_on') ? 'grid' : 'none';
+    const n = (z.polygon||[]).length;
+    document.getElementById('zpPointCount').textContent = n + ' point' + (n !== 1 ? 's' : '');
+  } else {
+    props.style.display = 'none';
+  }
+}
+
+function setActiveZone(idx) { activeZoneIdx = idx; renderZoneList(); drawCanvas(); }
+
+function addZone() {
+  zones.push({ name: 'zone_'+(zones.length+1), type: 'side_on', polygon: [] });
+  activeZoneIdx = zones.length - 1;
+  renderZoneList();
+  drawCanvas();
+}
+
+function deleteZone(idx) {
+  if (!confirm('Delete zone "' + (zones[idx].name||'Zone '+(idx+1)) + '"?')) return;
+  zones.splice(idx, 1);
+  if (activeZoneIdx >= zones.length) activeZoneIdx = Math.max(0, zones.length-1);
+  renderZoneList();
+  drawCanvas();
+}
+
+function clearZonePoints() {
+  if (zones[activeZoneIdx]) { zones[activeZoneIdx].polygon = []; renderZoneList(); drawCanvas(); }
+}
+
+function updateZoneProp(prop, val) {
+  if (!zones[activeZoneIdx]) return;
+  zones[activeZoneIdx][prop] = val;
+  if (prop === 'type') document.getElementById('zpPpmRow').style.display = val === 'side_on' ? 'grid' : 'none';
+  renderZoneList();
+  drawCanvas();
+}
+
+async function saveZones() {
+  const payload = zones.map(z => {
+    const out = { name: z.name, type: z.type, polygon: z.polygon || [] };
+    if (z.type === 'side_on') {
+      if (z.ppm_left)  out.ppm_left  = parseFloat(z.ppm_left);
+      if (z.ppm_right) out.ppm_right = parseFloat(z.ppm_right);
+    }
+    return out;
+  });
+  const res  = await fetch('/api/zones', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({zones: payload}) });
+  const data = await res.json();
+  alert(data.ok ? 'zones.json saved!' : 'Error: ' + (data.error||'unknown'));
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadFileTree();
-setInterval(() => {
-  fetch('/api/status').then(r => r.json()).then(s => {
-    setRunning(s.running);
-  });
-}, 2000);
+setInterval(() => { fetch('/api/status').then(r=>r.json()).then(s=>setRunning(s.running)); }, 2000);
 </script>
 </body>
 </html>
