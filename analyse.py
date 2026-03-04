@@ -257,7 +257,7 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
     elif force_day:
         night_mode = False
     else:
-        night_mode = is_night(first_frame)
+        night_mode = bool(is_night(first_frame))
 
     print(f"Mode:  {'NIGHT' if night_mode else 'DAY'}")
 
