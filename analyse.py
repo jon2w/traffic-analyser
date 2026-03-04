@@ -239,6 +239,7 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
             zone_dirs  = []
             zone_cls   = [] if not night_mode else None
             zone_conf  = [] if not night_mode else None
+            zone_boxes = [] 
 
             for i, (cx, cy) in enumerate(centroids):
                 if point_in_polygon(cx, cy, zone["polygon"], frame_w, frame_h):
@@ -247,11 +248,13 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
                     if not night_mode:
                         zone_cls.append(classes[i])
                         zone_conf.append(confidences[i])
+                        zone_boxes.append(boxes[i])
 
             vt.update(zone_cents, ts,
                       directions=zone_dirs,
                       classes=zone_cls,
-                      confs=zone_conf)
+                      confs=zone_conf,
+                      boxes=zone_boxes)
 
         # FPS counter
         now        = time.time()
