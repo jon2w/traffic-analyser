@@ -7,7 +7,7 @@ Zone polygons are defined in zones.json (edit with tune_zones.py).
 # =============================================================================
 # DATABASE
 # =============================================================================
-DB_HOST     = "localhost"       # MariaDB host
+DB_HOST     = "127.0.0.1"       # MariaDB host
 DB_PORT     = 3307
 DB_NAME     = "traffic"
 DB_USER     = "traffic_sync"
