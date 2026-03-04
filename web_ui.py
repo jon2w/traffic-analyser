@@ -224,7 +224,6 @@ def api_batch():
     if mode == "night": cmd.append("--night")
     if dry_run: cmd.append("--dry-run")
     if force:   cmd.append("--force")
-    cmd.append("--save-db") if not dry_run else None
 
     threading.Thread(target=_run_job, args=(cmd, "batch"),
                      daemon=True).start()
