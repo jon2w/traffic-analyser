@@ -119,23 +119,11 @@ class VehicleTracker:
         self.finalised  = set()
 
     def update(self, centroids, ts, directions=None, classes=None, confs=None):
-        """
-        Update tracker with new detections.
-
-        centroids  : list of (cx, cy)
-        ts         : timestamp in milliseconds
-        directions : optional list of direction strings matching centroids
-        classes    : optional list of vehicle class strings
-        confs      : optional list of confidence floats
-        """
         objects    = self.ct.update(centroids, ts)
         active_ids = set(objects.keys())
 
-        # Map new centroids to object IDs for metadata assignment
-        # We do this by matching centroids to objects by position
         if directions or classes or confs:
             for i, cent in enumerate(centroids):
-                # Find closest object ID to this centroid
                 best_oid, best_dist = None, 999999
                 for oid, obj_cent in objects.items():
                     d = math.hypot(cent[0] - obj_cent[0], cent[1] - obj_cent[1])
@@ -154,7 +142,6 @@ class VehicleTracker:
             self.paths[oid].append((cent[0], cent[1], ts))
             path = self.paths[oid]
 
-            # Speed from a window of positions
             if len(path) >= 2:
                 t_now = path[-1][2]
                 ref = path[0]
@@ -179,12 +166,22 @@ class VehicleTracker:
             if oid not in self.counted and len(path) >= MIN_TRACK_FRAMES:
                 self.counted.add(oid)
 
-        # Finalise tracks that have been dropped by the centroid tracker
         for oid in list(self.paths):
             if oid not in active_ids and oid not in self.finalised:
                 self._finalise(oid)
 
         return objects
+
+    def _net_direction(self, path):
+        """
+        Determine direction of travel from the median x-delta across all
+        track points. Much more robust than first-vs-last comparison —
+        a brief merge or occlusion at the end can't flip the result.
+        """
+        if len(path) < 2:
+            return "right" if path[-1][0] > path[0][0] else "left"
+        x_deltas = [path[i][0] - path[i-1][0] for i in range(1, len(path))]
+        return "right" if np.median(x_deltas) > 0 else "left"
 
     def _finalise(self, oid):
         self.finalised.add(oid)
@@ -194,8 +191,9 @@ class VehicleTracker:
             self.paths.pop(oid, None)
             return
 
-        # Reject stationary detections — total displacement too small
-        total_displacement = math.hypot(path[-1][0] - path[0][0], path[-1][1] - path[0][1])
+        # Reject stationary detections
+        total_displacement = math.hypot(path[-1][0] - path[0][0],
+                                        path[-1][1] - path[0][1])
         if total_displacement < MIN_TRACK_DISPLACEMENT_PX:
             self.paths.pop(oid, None)
             return
@@ -203,21 +201,12 @@ class VehicleTracker:
         xs  = [p[0] for p in path]
         dur = (path[-1][2] - path[0][2]) / 1000.0
 
-        # Direction: use median x-velocity across all track points — robust to
-        # brief merges where a track appears to reverse at the end
-        if len(path) >= 2:
-            x_deltas = [path[i][0] - path[i-1][0] for i in range(1, len(path))]
-            net_direction = "right" if np.median(x_deltas) > 0 else "left"
-        else:
-            net_direction = "right" if xs[-1] > xs[0] else "left"
-
-        direction = self.directions.get(oid)
-        if not direction or direction == "unknown":
-            direction = net_direction
-        else:
-            # Sanity check: if detector direction contradicts overall movement, trust movement
-            if direction != net_direction:
-                direction = net_direction
+        # Direction: use median x-velocity — robust to merges and occlusion.
+        # If a detector-provided direction exists but contradicts the overall
+        # movement, trust the movement.
+        net_dir   = self._net_direction(path)
+        det_dir   = self.directions.get(oid)
+        direction = net_dir if (not det_dir or det_dir == "unknown" or det_dir != net_dir) else det_dir
 
         # Final speed from middle portion of track (avoids edge distortion)
         n    = len(path)
@@ -230,7 +219,7 @@ class VehicleTracker:
             dt_ms = t2 - t1
             if dt_ms > 50:
                 px_dist = math.hypot(x2 - x1, y2 - y1)
-                ppm = self.ppm_right if xs[-1] > xs[0] else self.ppm_left
+                ppm = self.ppm_right if net_dir == "right" else self.ppm_left
                 s = (px_dist / ppm) / (dt_ms / 1000.0) * 3.6
                 if 1.0 < s < 200:
                     speed = s
@@ -253,7 +242,7 @@ class VehicleTracker:
         }
         self.vehicles.append(record)
 
-        dir_arrow = "→" if direction == "right" else "←"
+        dir_arrow = "->" if direction == "right" else "<-"
         print(f"  [{self.zone_name}] Vehicle #{len(self.vehicles):03d} | "
               f"{dir_arrow} {direction} | ~{speed:.0f} km/h | "
               f"{vehicle_class} | {len(path)} frames ({dur:.1f}s)")
@@ -265,8 +254,7 @@ class VehicleTracker:
         path = self.paths.get(oid)
         if not path or len(path) < 2:
             return ""
-        x_deltas = [path[i][0] - path[i-1][0] for i in range(1, len(path))]
-        d = "->" if np.median(x_deltas) > 0 else "<-"
+        d   = "->" if self._net_direction(path) == "right" else "<-"
         spd = self.speeds.get(oid, 0.0)
         cls = self.classes.get(oid, "")
         return f"{d} {spd:.0f}km/h {cls}".strip()
