@@ -595,32 +595,37 @@ async function loadFileTree() {
   const count = document.getElementById('fileCount');
 
   let total = 0;
-  let html = '';
+  tree.innerHTML = '';
 
   for (const [dateDir, files] of Object.entries(data.tree)) {
     const dayCount = files.length;
     total += dayCount;
-    html += `<div class="date-group" id="grp-${dateDir}">
-      <div class="date-header" data-date="${dateDir}" onclick="toggleGroup(this.dataset.date)">
-        <span class="chevron">▼</span> ${dateDir}
-        <span style="margin-left:auto;color:var(--muted)">${dayCount}</span>
-      </div>
-      <div class="file-list">`;
+    const grpDiv = document.createElement('div');
+    grpDiv.className = 'date-group';
+    grpDiv.id = 'grp-' + dateDir;
+    const hdr = document.createElement('div');
+    hdr.className = 'date-header';
+    hdr.dataset.date = dateDir;
+    hdr.onclick = function() { toggleGroup(this.dataset.date); };
+    hdr.innerHTML = '<span class="chevron">\u25bc</span> ' + dateDir + '<span style="margin-left:auto;color:var(--muted)">' + dayCount + '</span>';
+    const list = document.createElement('div');
+    list.className = 'file-list';
     for (const f of files) {
-      const processed = processedFiles.has(f.path) ? 'processed' : '';
-      const night     = f.is_night ? 'night' : '';
-      html += `<div class="file-item ${processed} ${night}"
-                    data-path="${f.path}"
-                    data-label="${f.label}"
-                    data-date="${dateDir}"
-                    onclick="selectFile(this.dataset.path, this.dataset.label, this.dataset.date)">
-                 <div class="dot"></div>${f.label}
-               </div>`;
+      const el = document.createElement('div');
+      el.className = 'file-item' + (processedFiles.has(f.path) ? ' processed' : '') + (f.is_night ? ' night' : '');
+      el.dataset.path  = f.path;
+      el.dataset.label = f.label;
+      el.dataset.date  = dateDir;
+      el.onclick = function() { selectFile(this.dataset.path, this.dataset.label, this.dataset.date); };
+      el.innerHTML = '<div class="dot"></div>' + f.label;
+      list.appendChild(el);
     }
-    html += `</div></div>`;
+    grpDiv.appendChild(hdr);
+    grpDiv.appendChild(list);
+    tree.appendChild(grpDiv);
   }
 
-  tree.innerHTML = html || '<div class="empty-state"><div class="icon">📭</div>No recordings found</div>';
+    if (!total) tree.innerHTML = '<div class="empty-state">No recordings found</div>';
   count.textContent = total;
 }
 
