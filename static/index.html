@@ -646,8 +646,9 @@ function runAnalyse() {
       // Show annotated video if produced
       fetch('/api/job_output').then(r => r.json()).then(out => {
         if (out.path) {
-          document.getElementById('videoWrap').style.display = 'block';
-          document.getElementById('videoPlayer').src = '/api/video?path=' + encodeURIComponent(out.path);
+          const wrap = document.getElementById('videoWrap');
+          wrap.style.display = 'block';
+          wrap.innerHTML = '<a class="btn btn-ghost" style="display:inline-block;margin:1rem" href="/api/video?path=' + encodeURIComponent(out.path) + '" download>⬇ Download annotated video</a><p style="font-family:monospace;font-size:0.7rem;color:var(--muted);padding:0 1rem 1rem">' + out.path + '</p>';
         }
       });
     });

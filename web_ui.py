@@ -160,26 +160,9 @@ def _run_job(cmd, job_type, output_path=None):
             _job["log"].append(("out", line.rstrip()))
         proc.wait()
 
-        # Transcode to H.264 for browser playback
+        # Note: Synology ffmpeg lacks H.264 encoder — serve original for download
         if job_type == "analyse" and output_path and os.path.exists(output_path):
-            h264_path = output_path.replace(".mp4", "_web.mp4")
-            _job["log"].append(("out", "Transcoding to H.264 for browser playback..."))
-            try:
-                r = subprocess.run(
-                    ["ffmpeg", "-y", "-i", output_path,
-                     "-vcodec", "libx264", "-preset", "fast",
-                     "-crf", "23", "-movflags", "+faststart",
-                     "-acodec", "aac", h264_path],
-                    capture_output=True, text=True
-                )
-                if r.returncode == 0 and os.path.exists(h264_path):
-                    os.remove(output_path)
-                    _job["output"] = h264_path
-                    _job["log"].append(("out", "Transcode complete."))
-                else:
-                    _job["log"].append(("err", "Transcode failed — showing original"))
-            except Exception as te:
-                _job["log"].append(("err", f"Transcode error: {te}"))
+            _job["log"].append(("out", f"Annotated video saved: {output_path}"))
 
     except Exception as e:
         _job["log"].append(("err", str(e)))
