@@ -8,10 +8,10 @@ Zone polygons are defined in zones.json (edit with tune_zones.py).
 # DATABASE
 # =============================================================================
 DB_HOST     = "localhost"       # MariaDB host
-DB_PORT     = 3306
+DB_PORT     = 3307
 DB_NAME     = "traffic"
-DB_USER     = "traffic_user"
-DB_PASSWORD = "changeme"        # change this!
+DB_USER     = "traffic_sync"
+DB_PASSWORD = "384r7tyb$_T8w7yef"        # change this!
 
 # =============================================================================
 # PATHS
