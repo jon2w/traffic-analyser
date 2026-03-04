@@ -1,9 +1,12 @@
 """
 detect/yolo_day.py — YOLO-based vehicle detection for daytime footage.
+Uses ByteTrack for robust multi-object tracking across frames.
 """
-
 import cv2
+import os
 import numpy as np
+import torch
+torch.backends.nnpack.enabled = False
 
 from config import (YOLO_MODEL, YOLO_CONFIDENCE, YOLO_CLASSES, YOLO_DEVICE)
 
@@ -11,7 +14,6 @@ from config import (YOLO_MODEL, YOLO_CONFIDENCE, YOLO_CLASSES, YOLO_DEVICE)
 CLASS_NAMES = {2: "car", 3: "motorbike", 5: "bus", 7: "truck"}
 
 _model = None
-
 
 def _get_model():
     global _model
@@ -22,25 +24,36 @@ def _get_model():
             raise ImportError("Run: pip install ultralytics")
         print(f"Loading YOLO model: {YOLO_MODEL}")
         _model = YOLO(YOLO_MODEL)
+        torch.backends.nnpack.enabled = False
     return _model
 
 
 def detect(frame):
     """
-    Run YOLO on a frame and return vehicle detections.
+    Run YOLO+ByteTrack on a frame and return vehicle detections.
+    ByteTrack maintains consistent IDs across frames, handling occlusion
+    much better than frame-by-frame detection alone.
 
     Returns:
-        centroids : list of (cx, cy)
-        boxes     : list of (x, y, w, h)
-        classes   : list of class label strings ("car", "truck" etc.)
-        confidences: list of float confidence scores
-        debug_frame: annotated frame for visualisation
+        centroids   : list of (cx, cy)
+        boxes       : list of (x, y, w, h)
+        classes     : list of class label strings ("car", "truck" etc.)
+        confidences : list of float confidence scores
+        debug_frame : annotated frame for visualisation
     """
     model = _get_model()
-    results = model(frame, conf=YOLO_CONFIDENCE, classes=YOLO_CLASSES,
-                    device=YOLO_DEVICE, verbose=False)
 
-    centroids, boxes, classes, confidences = [], [], [], []
+    results = model.track(
+        frame,
+        conf=YOLO_CONFIDENCE,
+        classes=YOLO_CLASSES,
+        device=YOLO_DEVICE,
+        verbose=False,
+        tracker="bytetrack.yaml",
+        persist=True,   # keep track state between calls
+    )
+
+    centroids, boxes, classes, confidences, track_ids = [], [], [], [], []
     debug_frame = frame.copy()
 
     for result in results:
@@ -48,20 +61,27 @@ def detect(frame):
             cls_id = int(box.cls[0])
             if cls_id not in YOLO_CLASSES:
                 continue
-            conf = float(box.conf[0])
+            conf  = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             w, h = x2 - x1, y2 - y1
             cx, cy = x1 + w // 2, y1 + h // 2
+
+            # ByteTrack ID (None if not yet assigned)
+            tid = int(box.id[0]) if box.id is not None else None
 
             centroids.append((cx, cy))
             boxes.append((x1, y1, w, h))
             classes.append(CLASS_NAMES.get(cls_id, "vehicle"))
             confidences.append(round(conf, 2))
+            track_ids.append(tid)
 
             # Draw on debug frame
             label = f"{CLASS_NAMES.get(cls_id,'?')} {conf:.0%}"
-            cv2.rectangle(debug_frame, (x1, y1), (x2, y2), (0, 200, 0), 2)
+            if tid is not None:
+                label += f" #{tid}"
+            colour = (0, 200, 0)
+            cv2.rectangle(debug_frame, (x1, y1), (x2, y2), colour, 2)
             cv2.putText(debug_frame, label, (x1, y1 - 6),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 1)
 
     return centroids, boxes, classes, confidences, debug_frame
