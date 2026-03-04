@@ -83,6 +83,9 @@ STATIONARY_GRID_PX   = 20   # snap grid for position matching
 STATIONARY_FRAMES    = 10   # frames before declared stationary (~0.67s at 15fps)
 STATIONARY_RADIUS_PX = 15   # max drift (px) to still be considered stationary
 
+HIST_MIN_CORR  = 0.5   # minimum histogram correlation to allow a match
+HIST_EMA_ALPHA = 0.85  # weight of stored histogram vs new observation
+
 
 # =============================================================================
 # MONITOR

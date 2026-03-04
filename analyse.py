@@ -333,7 +333,8 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
                       directions=zone_dirs,
                       classes=zone_cls,
                       confs=zone_conf,
-                      boxes=zone_boxes)
+                      boxes=zone_boxes,
+                      frame=frame)
 
         # FPS counter
         now        = time.time()
