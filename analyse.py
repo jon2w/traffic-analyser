@@ -7,6 +7,14 @@ Usage:
     python analyse.py --input video.mp4 --no-show --save-db
     python analyse.py --input video.mp4 --day      # force day mode
     python analyse.py --input video.mp4 --night    # force night mode
+
+Changes vs previous version:
+  - StationaryFilter class added.  Centroids that have been detected in
+    approximately the same position for STATIONARY_FRAMES consecutive frames
+    are suppressed before they reach the zone trackers.  This prevents parked
+    cars entering the tracker and corrupting tracks of passing vehicles via
+    IoU-based merging.
+  - boxes now passed through to vt.update() for IoU-assisted matching.
 """
 
 import argparse
@@ -25,6 +33,9 @@ from config import (
     THUMBNAILS_ROOT,
     PPM_MAIN_LEFT,
     PPM_MAIN_RIGHT,
+    STATIONARY_GRID_PX,
+    STATIONARY_FRAMES,
+    STATIONARY_RADIUS_PX,
 )
 from zones_loader import ZONES
 from tracker import VehicleTracker
@@ -49,6 +60,70 @@ def get_args():
     return p.parse_args()
 
 
+# ─── Stationary filter ────────────────────────────────────────────────────────
+
+class StationaryFilter:
+    """
+    Suppresses centroids that have remained in approximately the same position
+    for STATIONARY_FRAMES consecutive frames — i.e. parked or stopped vehicles
+    that should not enter the tracker.
+
+    How it works
+    ------------
+    Each centroid is snapped to a coarse grid (STATIONARY_GRID_PX) to create a
+    stable key.  We keep a rolling history of the raw positions seen at each
+    grid cell.  If the last STATIONARY_FRAMES positions all fall within
+    STATIONARY_RADIUS_PX of the first of those positions, the centroid is
+    declared stationary and filtered out.
+
+    A centroid that was stationary but then starts moving will be re-admitted
+    as soon as its drift exceeds STATIONARY_RADIUS_PX — so vehicles that pull
+    away from a stop are not permanently suppressed.
+
+    Thread safety: single-threaded use only (fine for this project).
+    """
+
+    def __init__(self):
+        # grid_key → deque of (cx, cy) raw positions
+        self._history = {}
+
+    def _key(self, cx, cy):
+        return (round(cx / STATIONARY_GRID_PX),
+                round(cy / STATIONARY_GRID_PX))
+
+    def is_stationary(self, cx, cy):
+        """
+        Record this observation and return True if the centroid looks parked.
+        Call once per centroid per frame.
+        """
+        key  = self._key(cx, cy)
+        hist = self._history.get(key)
+        if hist is None:
+            hist = []
+            self._history[key] = hist
+
+        hist.append((cx, cy))
+        # Keep only 3× the window so memory doesn't grow unbounded
+        max_keep = STATIONARY_FRAMES * 3
+        if len(hist) > max_keep:
+            del hist[:-max_keep]
+
+        if len(hist) < STATIONARY_FRAMES:
+            # Not enough history yet — let it through
+            return False
+
+        recent = hist[-STATIONARY_FRAMES:]
+        anchor_x, anchor_y = recent[0]
+        max_drift = max(
+            math.hypot(px - anchor_x, py - anchor_y)
+            for px, py in recent
+        )
+        return max_drift < STATIONARY_RADIUS_PX
+
+    def reset(self):
+        self._history.clear()
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def is_night(frame):
@@ -56,7 +131,7 @@ def is_night(frame):
 
 
 def point_in_polygon(x, y, polygon, frame_w, frame_h):
-    """Check if (x,y) pixel is inside a zone polygon (defined as fractions)."""
+    """Check if (x,y) pixel is inside a zone polygon (pixel coordinates)."""
     pts = np.array([(int(px), int(py)) for px, py in polygon], dtype=np.int32)
     return cv2.pointPolygonTest(pts, (float(x), float(y)), False) >= 0
 
@@ -75,10 +150,8 @@ def open_writer(output_path, fps, frame_w, frame_h):
 def parse_recording_time(filename):
     """Try to parse datetime from MotionEye filename like 2026-02-28/08-20-37.mp4"""
     basename = os.path.basename(filename)
-    # Try HH-MM-SS.mp4
-    m = re.search(r'(\d{2})-(\d{2})-(\d{2})\.mp4', basename)
+    m  = re.search(r'(\d{2})-(\d{2})-(\d{2})\.mp4', basename)
     parent = os.path.basename(os.path.dirname(filename))
-    # Try YYYY-MM-DD parent folder
     dm = re.match(r'(\d{4})-(\d{2})-(\d{2})', parent)
     if m and dm:
         try:
@@ -90,7 +163,6 @@ def parse_recording_time(filename):
 
 
 def save_thumbnail(frame, vehicle_id, recording_id, output_dir):
-    """Save a cropped thumbnail of the vehicle's last known position."""
     os.makedirs(output_dir, exist_ok=True)
     filename = f"rec{recording_id:06d}_v{vehicle_id:04d}.jpg"
     path = os.path.join(output_dir, filename)
@@ -104,21 +176,18 @@ def draw_overlay(frame, zone_trackers, night_mode, fps_actual, frame_w, frame_h)
     from config import NIGHT_ROI_TOP, NIGHT_ROI_BOTTOM
     from zones_loader import ZONES
 
-    # Zone polygons
     for zone in ZONES:
         pts = np.array([(int(px), int(py))
                         for px, py in zone["polygon"]], dtype=np.int32)
         cv2.polylines(frame, [pts], True, (0, 255, 255), 1)
 
-    # Night ROI lines
     if night_mode:
         rt = int(frame_h * NIGHT_ROI_TOP)
         rb = int(frame_h * NIGHT_ROI_BOTTOM)
         cv2.line(frame, (0, rt), (frame_w, rt), (255, 130, 0), 1)
         cv2.line(frame, (0, rb), (frame_w, rb), (255, 130, 0), 1)
 
-    # Tracks and labels for each zone tracker
-    total_count = 0
+    total_count  = 0
     total_active = 0
     for vt in zone_trackers:
         objects = vt.ct.objects
@@ -136,7 +205,6 @@ def draw_overlay(frame, zone_trackers, night_mode, fps_actual, frame_w, frame_h)
                             (int(cent[0]) - 40, int(cent[1]) - 14),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
-    # HUD
     mode_str = "NIGHT" if night_mode else "DAY"
     cv2.rectangle(frame, (0, 0), (340, 90), (0, 0, 0), -1)
     cv2.putText(frame, f"Vehicles counted: {total_count}",
@@ -154,7 +222,6 @@ def draw_overlay(frame, zone_trackers, night_mode, fps_actual, frame_w, frame_h)
 def analyse(input_path, output_path=None, force_night=False, force_day=False,
             show=True, save_db=False, save_thumbs=False, force=False):
 
-    # Skip if already processed (unless --force)
     if save_db and not force:
         try:
             import database as db
@@ -168,11 +235,11 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open: {input_path}")
 
-    fps     = cap.get(cv2.CAP_PROP_FPS) or 10.0
-    frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps          = cap.get(cv2.CAP_PROP_FPS) or 10.0
+    frame_w      = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_h      = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    duration_s = total_frames / fps if fps > 0 else 0
+    duration_s   = total_frames / fps if fps > 0 else 0
 
     print(f"Video: {frame_w}×{frame_h} @ {fps:.1f} fps  "
           f"({total_frames} frames, {duration_s:.1f}s)")
@@ -180,7 +247,6 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
 
     writer = open_writer(output_path, fps, frame_w, frame_h) if output_path else None
 
-    # Determine night/day from first frame
     ret, first_frame = cap.read()
     if not ret:
         raise RuntimeError("Could not read first frame")
@@ -195,7 +261,6 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
 
     print(f"Mode:  {'NIGHT' if night_mode else 'DAY'}")
 
-    # Load detectors
     if night_mode:
         from detect.night import detect as night_detect
         detector = night_detect
@@ -210,6 +275,10 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
         ppm_r = zone.get("ppm_right", PPM_MAIN_RIGHT)
         zone_trackers.append(VehicleTracker(fps, ppm_l, ppm_r, zone["name"]))
 
+    # One stationary filter shared across all zones — a parked car is parked
+    # regardless of which zone polygon it falls in.
+    stationary_filter = StationaryFilter()
+
     recorded_at = parse_recording_time(input_path)
     t_prev      = time.time()
     fps_actual  = fps
@@ -223,7 +292,6 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
 
         ts = cap.get(cv2.CAP_PROP_POS_MSEC)
 
-        # Detect
         if night_mode:
             centroids, boxes, directions, vtypes, debug_frame, debug_mask = \
                 detector(frame)
@@ -233,22 +301,33 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
             directions = ["unknown"] * len(centroids)
             vtypes     = ["yolo"]   * len(centroids)
 
-        # Route detections to zone trackers based on centroid location
+        # ── Stationary filter ─────────────────────────────────────────────────
+        # Build a mask of which detections are moving.  We evaluate every
+        # centroid (not just zone-filtered ones) so the filter history is
+        # consistent across the full frame.
+        moving_mask = [
+            not stationary_filter.is_stationary(cx, cy)
+            for cx, cy in centroids
+        ]
+
+        # ── Route moving detections to zone trackers ──────────────────────────
         for vt, zone in zip(zone_trackers, ZONES):
             zone_cents = []
             zone_dirs  = []
+            zone_boxes = []
             zone_cls   = [] if not night_mode else None
             zone_conf  = [] if not night_mode else None
-            zone_boxes = [] 
 
             for i, (cx, cy) in enumerate(centroids):
+                if not moving_mask[i]:
+                    continue   # skip stationary detections
                 if point_in_polygon(cx, cy, zone["polygon"], frame_w, frame_h):
                     zone_cents.append((cx, cy))
                     zone_dirs.append(directions[i])
+                    zone_boxes.append(boxes[i])
                     if not night_mode:
                         zone_cls.append(classes[i])
                         zone_conf.append(confidences[i])
-                        zone_boxes.append(boxes[i])
 
             vt.update(zone_cents, ts,
                       directions=zone_dirs,
@@ -271,7 +350,6 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
-    # Finalise all remaining tracks
     for vt in zone_trackers:
         vt.finalise_all()
 
@@ -281,9 +359,8 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
     try:
         cv2.destroyAllWindows()
     except cv2.error:
-    	pass
+        pass
 
-    # Collect all vehicles across zones
     all_vehicles = []
     for vt in zone_trackers:
         all_vehicles.extend(vt.vehicles)
@@ -323,21 +400,20 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
             for v in all_vehicles:
                 thumb_path = None
                 if save_thumbs:
-                    # We'd need to save a frame crop here — placeholder for now
                     pass
                 vehicle_id = db.insert_vehicle(
-                    recording_id = recording_id,
-                    zone         = v["zone"],
-                    direction    = v["direction"],
-                    speed_kmh    = v["speed_kmh"],
+                    recording_id  = recording_id,
+                    zone          = v["zone"],
+                    direction     = v["direction"],
+                    speed_kmh     = v["speed_kmh"],
                     vehicle_class = v["vehicle_class"],
-                    confidence   = v.get("confidence"),
-                    track_frames = v["track_frames"],
-                    duration_s   = v["duration_s"],
+                    confidence    = v.get("confidence"),
+                    track_frames  = v["track_frames"],
+                    duration_s    = v["duration_s"],
                     first_seen_ms = v["first_seen_ms"],
                     last_seen_ms  = v["last_seen_ms"],
                     thumbnail_path = thumb_path,
-                    detected_at  = recorded_at,
+                    detected_at   = recorded_at,
                 )
                 db.insert_track_points(vehicle_id, v["track_points"])
 

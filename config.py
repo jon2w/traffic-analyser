@@ -78,6 +78,12 @@ SPEED_EMA_ALPHA      = 0.75    # smoothing (0=none, 1=never updates)
 MIN_TRACK_DISPLACEMENT_PX = 50  # minimum total displacement to count as real vehicle
 
 
+# Stationary object filter
+STATIONARY_GRID_PX   = 20   # snap grid for position matching
+STATIONARY_FRAMES    = 10   # frames before declared stationary (~0.67s at 15fps)
+STATIONARY_RADIUS_PX = 15   # max drift (px) to still be considered stationary
+
+
 # =============================================================================
 # MONITOR
 # =============================================================================
