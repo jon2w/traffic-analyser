@@ -57,8 +57,7 @@ def is_night(frame):
 
 def point_in_polygon(x, y, polygon, frame_w, frame_h):
     """Check if (x,y) pixel is inside a zone polygon (defined as fractions)."""
-    pts = np.array([(int(px * frame_w), int(py * frame_h))
-                    for px, py in polygon], dtype=np.int32)
+    pts = np.array([(int(px), int(py)) for px, py in polygon], dtype=np.int32)
     return cv2.pointPolygonTest(pts, (float(x), float(y)), False) >= 0
 
 
@@ -107,7 +106,7 @@ def draw_overlay(frame, zone_trackers, night_mode, fps_actual, frame_w, frame_h)
 
     # Zone polygons
     for zone in ZONES:
-        pts = np.array([(int(px * frame_w), int(py * frame_h))
+        pts = np.array([(int(px), int(py))
                         for px, py in zone["polygon"]], dtype=np.int32)
         cv2.polylines(frame, [pts], True, (0, 255, 255), 1)
 
