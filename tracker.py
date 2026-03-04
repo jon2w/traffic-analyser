@@ -203,10 +203,21 @@ class VehicleTracker:
         xs  = [p[0] for p in path]
         dur = (path[-1][2] - path[0][2]) / 1000.0
 
-        # Direction: prefer detector-provided direction, fall back to movement
+        # Direction: use median x-velocity across all track points — robust to
+        # brief merges where a track appears to reverse at the end
+        if len(path) >= 2:
+            x_deltas = [path[i][0] - path[i-1][0] for i in range(1, len(path))]
+            net_direction = "right" if np.median(x_deltas) > 0 else "left"
+        else:
+            net_direction = "right" if xs[-1] > xs[0] else "left"
+
         direction = self.directions.get(oid)
         if not direction or direction == "unknown":
-            direction = "right" if xs[-1] > xs[0] else "left"
+            direction = net_direction
+        else:
+            # Sanity check: if detector direction contradicts overall movement, trust movement
+            if direction != net_direction:
+                direction = net_direction
 
         # Final speed from middle portion of track (avoids edge distortion)
         n    = len(path)
@@ -254,8 +265,8 @@ class VehicleTracker:
         path = self.paths.get(oid)
         if not path or len(path) < 2:
             return ""
-        xs = [p[0] for p in path]
-        d  = "->" if xs[-1] > xs[0] else "<-"
+        x_deltas = [path[i][0] - path[i-1][0] for i in range(1, len(path))]
+        d = "->" if np.median(x_deltas) > 0 else "<-"
         spd = self.speeds.get(oid, 0.0)
         cls = self.classes.get(oid, "")
         return f"{d} {spd:.0f}km/h {cls}".strip()
