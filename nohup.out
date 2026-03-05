@@ -1,0 +1,449 @@
+2026-03-04 17:35:31  INFO      Batch started — log: /volume1/traffic/traffic_analyser/logs/batch_2026-03-04_17-35-31.log
+2026-03-04 17:35:31  INFO      Args: {'dry_run': False, 'force': False, 'limit': 20, 'camera': None, 'since': '2026-03-01', 'day': False, 'night': False, 'from_file': None, 'timeout': 300, 'failed_out': 'failed.txt'}
+2026-03-04 17:35:31  INFO      Found 5161 recording(s) total
+2026-03-04 17:35:34  DEBUG     SKIP (done): /volume1/traffic/recordings/Camera1/2026-03-03/07-20-04.mp4
+2026-03-04 17:35:37  INFO      Skipping 1 already-processed file(s)
+2026-03-04 17:35:37  INFO      --limit: processing first 20 file(s)
+2026-03-04 17:35:37  INFO      
+20 file(s) to process (timeout 300s/file)
+
+2026-03-04 17:35:37  INFO      [1/20] Camera1/2026-03-01/00-00-23.mp4
+Video: 1280×720 @ 10.2 fps  (28 frames, 2.8s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-00-23.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~8 km/h | unknown | 18 frames (1.7s)
+  [main] Vehicle #002 | <- left | ~33 km/h | unknown | 19 frames (1.8s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 2
+Average speed  : 20.3 km/h
+Max speed      : 32.8 km/h
+Going right →  : 0
+Going left  ←  : 2
+  unknown     : 2
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:38  INFO        -> 2 vehicle(s) | 1.5s
+2026-03-04 17:35:38  INFO        5.0% | 1/20 | avg 1.5s/file | elapsed 0:00:01 | ETA 0:00:27
+2026-03-04 17:35:38  INFO      [2/20] Camera1/2026-03-01/00-02-43.mp4
+Video: 1280×720 @ 10.1 fps  (46 frames, 4.6s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-02-43.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~29 km/h | unknown | 26 frames (2.5s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 28.7 km/h
+Max speed      : 28.7 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:40  INFO        -> 1 vehicle(s) | 2.1s
+2026-03-04 17:35:40  INFO        10.0% | 2/20 | avg 1.8s/file | elapsed 0:00:03 | ETA 0:00:31
+2026-03-04 17:35:40  INFO      [3/20] Camera1/2026-03-01/00-04-37.mp4
+Video: 1280×720 @ 10.0 fps  (71 frames, 7.1s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-04-37.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~6 km/h | unknown | 18 frames (1.7s)
+  [main] Vehicle #002 | -> right | ~29 km/h | unknown | 34 frames (3.4s)
+  [main] Vehicle #003 | -> right | ~26 km/h | unknown | 34 frames (3.3s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 3
+Average speed  : 20.3 km/h
+Max speed      : 28.9 km/h
+Going right →  : 3
+Going left  ←  : 0
+  unknown     : 3
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:43  INFO        -> 3 vehicle(s) | 3.1s
+2026-03-04 17:35:43  INFO        15.0% | 3/20 | avg 2.2s/file | elapsed 0:00:06 | ETA 0:00:37
+2026-03-04 17:35:43  INFO      [4/20] Camera1/2026-03-01/00-06-12.mp4
+Video: 1280×720 @ 10.1 fps  (40 frames, 4.0s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-06-12.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~31 km/h | unknown | 24 frames (2.3s)
+  [main] Vehicle #002 | <- left | ~29 km/h | unknown | 24 frames (2.3s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 2
+Average speed  : 29.8 km/h
+Max speed      : 30.8 km/h
+Going right →  : 0
+Going left  ←  : 2
+  unknown     : 2
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:45  INFO        -> 2 vehicle(s) | 1.8s
+2026-03-04 17:35:45  INFO        20.0% | 4/20 | avg 2.1s/file | elapsed 0:00:08 | ETA 0:00:33
+2026-03-04 17:35:45  INFO      [5/20] Camera1/2026-03-01/00-07-42.mp4
+Video: 1280×720 @ 10.1 fps  (37 frames, 3.7s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-07-42.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~35 km/h | unknown | 22 frames (2.1s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 34.8 km/h
+Max speed      : 34.8 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:47  INFO        -> 1 vehicle(s) | 1.7s
+2026-03-04 17:35:47  INFO        25.0% | 5/20 | avg 2.0s/file | elapsed 0:00:10 | ETA 0:00:30
+2026-03-04 17:35:47  INFO      [6/20] Camera1/2026-03-01/00-09-16.mp4
+Video: 1280×720 @ 10.1 fps  (37 frames, 3.7s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-09-16.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~34 km/h | unknown | 28 frames (2.7s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 34.2 km/h
+Max speed      : 34.2 km/h
+Going right →  : 1
+Going left  ←  : 0
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:48  INFO        -> 1 vehicle(s) | 1.7s
+2026-03-04 17:35:48  INFO        30.0% | 6/20 | avg 2.0s/file | elapsed 0:00:11 | ETA 0:00:27
+2026-03-04 17:35:48  INFO      [7/20] Camera1/2026-03-01/00-12-48.mp4
+Video: 1280×720 @ 10.1 fps  (40 frames, 4.0s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-12-48.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~37 km/h | unknown | 21 frames (2.0s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 36.6 km/h
+Max speed      : 36.6 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:50  INFO        -> 1 vehicle(s) | 1.7s
+2026-03-04 17:35:50  INFO        35.0% | 7/20 | avg 1.9s/file | elapsed 0:00:13 | ETA 0:00:25
+2026-03-04 17:35:50  INFO      [8/20] Camera1/2026-03-01/00-14-52.mp4
+Video: 1280×720 @ 10.1 fps  (46 frames, 4.6s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-14-52.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~29 km/h | unknown | 28 frames (2.7s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 29.0 km/h
+Max speed      : 29.0 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:52  INFO        -> 1 vehicle(s) | 2.1s
+2026-03-04 17:35:52  INFO        40.0% | 8/20 | avg 1.9s/file | elapsed 0:00:15 | ETA 0:00:23
+2026-03-04 17:35:52  INFO      [9/20] Camera1/2026-03-01/00-16-50.mp4
+Video: 1280×720 @ 10.1 fps  (43 frames, 4.3s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-16-50.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~12 km/h | unknown | 25 frames (2.4s)
+  [main] Vehicle #002 | <- left | ~39 km/h | unknown | 22 frames (2.1s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 2
+Average speed  : 25.2 km/h
+Max speed      : 38.7 km/h
+Going right →  : 0
+Going left  ←  : 2
+  unknown     : 2
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:54  INFO        -> 2 vehicle(s) | 1.9s
+2026-03-04 17:35:54  INFO        45.0% | 9/20 | avg 1.9s/file | elapsed 0:00:17 | ETA 0:00:21
+2026-03-04 17:35:54  INFO      [10/20] Camera1/2026-03-01/00-20-41.mp4
+Video: 1280×720 @ 10.1 fps  (34 frames, 3.4s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-20-41.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~35 km/h | unknown | 26 frames (2.5s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 35.0 km/h
+Max speed      : 35.0 km/h
+Going right →  : 1
+Going left  ←  : 0
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:56  INFO        -> 1 vehicle(s) | 1.6s
+2026-03-04 17:35:56  INFO        50.0% | 10/20 | avg 1.9s/file | elapsed 0:00:19 | ETA 0:00:19
+2026-03-04 17:35:56  INFO      [11/20] Camera1/2026-03-01/00-24-28.mp4
+Video: 1280×720 @ 10.1 fps  (49 frames, 4.9s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-24-28.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~27 km/h | unknown | 30 frames (2.9s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 26.8 km/h
+Max speed      : 26.8 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:35:58  INFO        -> 1 vehicle(s) | 2.2s
+2026-03-04 17:35:58  INFO        55.0% | 11/20 | avg 1.9s/file | elapsed 0:00:21 | ETA 0:00:17
+2026-03-04 17:35:58  INFO      [12/20] Camera1/2026-03-01/00-26-09.mp4
+Video: 1280×720 @ 10.1 fps  (58 frames, 5.8s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-26-09.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~6 km/h | unknown | 18 frames (1.7s)
+  [main] Vehicle #002 | <- left | ~19 km/h | unknown | 32 frames (3.1s)
+  [main] Vehicle #003 | <- left | ~34 km/h | unknown | 22 frames (2.1s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 3
+Average speed  : 19.7 km/h
+Max speed      : 34.5 km/h
+Going right →  : 0
+Going left  ←  : 3
+  unknown     : 3
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:00  INFO        -> 3 vehicle(s) | 2.5s
+2026-03-04 17:36:00  INFO        60.0% | 12/20 | avg 2.0s/file | elapsed 0:00:23 | ETA 0:00:15
+2026-03-04 17:36:00  INFO      [13/20] Camera1/2026-03-01/00-26-24.mp4
+Video: 1280×720 @ 10.1 fps  (40 frames, 4.0s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-26-24.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~13 km/h | unknown | 24 frames (2.3s)
+  [main] Vehicle #002 | -> right | ~34 km/h | unknown | 30 frames (2.9s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 2
+Average speed  : 23.4 km/h
+Max speed      : 33.5 km/h
+Going right →  : 2
+Going left  ←  : 0
+  unknown     : 2
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:02  INFO        -> 2 vehicle(s) | 1.9s
+2026-03-04 17:36:02  INFO        65.0% | 13/20 | avg 2.0s/file | elapsed 0:00:25 | ETA 0:00:13
+2026-03-04 17:36:02  INFO      [14/20] Camera1/2026-03-01/00-28-23.mp4
+Video: 1280×720 @ 10.1 fps  (34 frames, 3.4s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-28-23.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~32 km/h | unknown | 25 frames (2.4s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 32.4 km/h
+Max speed      : 32.4 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:04  INFO        -> 1 vehicle(s) | 1.6s
+2026-03-04 17:36:04  INFO        70.0% | 14/20 | avg 1.9s/file | elapsed 0:00:27 | ETA 0:00:11
+2026-03-04 17:36:04  INFO      [15/20] Camera1/2026-03-01/00-28-36.mp4
+Video: 1280×720 @ 10.1 fps  (43 frames, 4.3s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-28-36.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | <- left | ~30 km/h | unknown | 24 frames (2.3s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 30.2 km/h
+Max speed      : 30.2 km/h
+Going right →  : 0
+Going left  ←  : 1
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:06  INFO        -> 1 vehicle(s) | 1.9s
+2026-03-04 17:36:06  INFO        75.0% | 15/20 | avg 1.9s/file | elapsed 0:00:29 | ETA 0:00:09
+2026-03-04 17:36:06  INFO      [16/20] Camera1/2026-03-01/00-31-24.mp4
+Video: 1280×720 @ 10.1 fps  (28 frames, 2.8s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-31-24.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~36 km/h | unknown | 28 frames (2.8s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 36.4 km/h
+Max speed      : 36.4 km/h
+Going right →  : 1
+Going left  ←  : 0
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:07  INFO        -> 1 vehicle(s) | 1.4s
+2026-03-04 17:36:07  INFO        80.0% | 16/20 | avg 1.9s/file | elapsed 0:00:30 | ETA 0:00:07
+2026-03-04 17:36:07  INFO      [17/20] Camera1/2026-03-01/00-37-15.mp4
+Video: 1280×720 @ 10.0 fps  (64 frames, 6.4s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-37-15.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~9 km/h | unknown | 21 frames (2.1s)
+  [main] Vehicle #002 | -> right | ~26 km/h | unknown | 37 frames (3.7s)
+  [main] Vehicle #003 | <- left | ~20 km/h | unknown | 37 frames (3.6s)
+  [main] Vehicle #004 | <- left | ~27 km/h | unknown | 25 frames (2.4s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 4
+Average speed  : 20.4 km/h
+Max speed      : 26.5 km/h
+Going right →  : 2
+Going left  ←  : 2
+  unknown     : 4
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:10  INFO        -> 4 vehicle(s) | 2.7s
+2026-03-04 17:36:10  INFO        85.0% | 17/20 | avg 1.9s/file | elapsed 0:00:33 | ETA 0:00:05
+2026-03-04 17:36:10  INFO      [18/20] Camera1/2026-03-01/00-38-57.mp4
+Video: 1280×720 @ 10.1 fps  (34 frames, 3.4s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-38-57.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~35 km/h | unknown | 30 frames (3.0s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 34.5 km/h
+Max speed      : 34.5 km/h
+Going right →  : 1
+Going left  ←  : 0
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:11  INFO        -> 1 vehicle(s) | 1.6s
+2026-03-04 17:36:11  INFO        90.0% | 18/20 | avg 1.9s/file | elapsed 0:00:34 | ETA 0:00:03
+2026-03-04 17:36:11  INFO      [19/20] Camera1/2026-03-01/00-41-16.mp4
+Video: 1280×720 @ 10.0 fps  (61 frames, 6.1s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-41-16.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~4 km/h | unknown | 45 frames (4.5s)
+  [main] Vehicle #002 | <- left | ~24 km/h | unknown | 32 frames (3.1s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 2
+Average speed  : 13.8 km/h
+Max speed      : 23.9 km/h
+Going right →  : 1
+Going left  ←  : 1
+  unknown     : 2
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:14  INFO        -> 2 vehicle(s) | 2.6s
+2026-03-04 17:36:14  INFO        95.0% | 19/20 | avg 2.0s/file | elapsed 0:00:37 | ETA 0:00:01
+2026-03-04 17:36:14  INFO      [20/20] Camera1/2026-03-01/00-42-37.mp4
+Video: 1280×720 @ 10.0 fps  (55 frames, 5.5s)
+File:  /volume1/traffic/recordings/Camera1/2026-03-01/00-42-37.mp4
+Mode:  NIGHT
+
+Processing — press Q to quit
+
+  [main] Vehicle #001 | -> right | ~26 km/h | unknown | 37 frames (3.7s)
+
+───────────────────────────────────────────────────────
+Total vehicles : 1
+Average speed  : 25.6 km/h
+Max speed      : 25.6 km/h
+Going right →  : 1
+Going left  ←  : 0
+  unknown     : 1
+───────────────────────────────────────────────────────
+
+Database error: Python type numpy.bool cannot be converted
+2026-03-04 17:36:16  INFO        -> 1 vehicle(s) | 2.4s
+2026-03-04 17:36:16  INFO        100.0% | 20/20 | avg 2.0s/file | elapsed 0:00:39 | ETA 0:00:00
+2026-03-04 17:36:16  INFO      
+=======================================================
+2026-03-04 17:36:16  INFO      Batch complete in 0:00:39:
+2026-03-04 17:36:16  INFO        Processed : 20
+2026-03-04 17:36:16  INFO        Skipped   : 0
+2026-03-04 17:36:16  INFO        Failed    : 0
+2026-03-04 17:36:16  INFO      =======================================================
+
