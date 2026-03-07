@@ -372,6 +372,182 @@ def api_zones_post():
         return jsonify({"ok": False, "error": str(e)})
 
 
+# ── Job queue API ─────────────────────────────────────────────────────────────
+
+@app.route("/api/jobs/next", methods=["POST"])
+def api_jobs_next():
+    """
+    Claim the next pending job for a worker.
+    Populates the queue from the recordings folder on first call if empty.
+    POST body: { "worker_id": "hostname_OS" }
+    Returns: { "job_id": int, "path": str, "rel_path": str }
+          or { "empty": true } if nothing available.
+    """
+    data      = request.json or {}
+    worker_id = data.get("worker_id", "unknown")
+
+    # Lazily populate queue if empty
+    try:
+        status = db.job_queue_status()
+        pending = status.get("pending", 0)
+        processing = status.get("processing", 0)
+        if pending == 0 and processing == 0:
+            added = db.job_queue_populate(RECORDINGS_ROOT)
+            if added:
+                print(f"Job queue populated: {added} new jobs")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    job_id, filename = db.job_claim_next(worker_id)
+    if job_id is None:
+        return jsonify({"empty": True})
+
+    rel = os.path.relpath(filename, RECORDINGS_ROOT)
+    return jsonify({
+        "job_id":   job_id,
+        "path":     filename,
+        "rel_path": rel,
+    })
+
+
+@app.route("/api/jobs/complete", methods=["POST"])
+def api_jobs_complete():
+    """
+    Accept processed results from a worker and insert into the database.
+    POST body: {
+        "job_id":    int,
+        "worker_id": str,
+        "vehicles":  [ vehicle_dict, ... ]   (from analyse() return value)
+    }
+    The vehicle dicts must include all fields that analyse() normally produces,
+    plus recording metadata is reconstructed from the filename.
+    """
+    data      = request.json or {}
+    job_id    = data.get("job_id")
+    worker_id = data.get("worker_id", "unknown")
+    vehicles  = data.get("vehicles", [])
+
+    if not job_id:
+        return jsonify({"ok": False, "error": "missing job_id"}), 400
+
+    # Look up the filename from the job
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT filename FROM job_locks WHERE id=%s", (job_id,))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({"ok": False, "error": "job_id not found"}), 404
+            filename = row[0]
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    # Parse recording metadata from filename
+    try:
+        import re
+        from datetime import datetime as dt
+        basename = os.path.basename(filename)
+        parent   = os.path.basename(os.path.dirname(filename))
+        m  = re.search(r'(\d{2})-(\d{2})-(\d{2})\.mp4', basename)
+        dm = re.match(r'(\d{4})-(\d{2})-(\d{2})', parent)
+        if m and dm:
+            recorded_at = dt(int(dm.group(1)), int(dm.group(2)), int(dm.group(3)),
+                             int(m.group(1)),  int(m.group(2)),  int(m.group(3)))
+        else:
+            recorded_at = dt.now()
+
+        # Get video metadata (duration, fps etc) from file if accessible
+        frame_w, frame_h, fps, duration_s, is_night = 1280, 720, 15.0, 0.0, False
+        if os.path.exists(filename):
+            import cv2
+            cap = cv2.VideoCapture(filename)
+            fps      = cap.get(cv2.CAP_PROP_FPS) or 15.0
+            frame_w  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_h  = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            frames   = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            duration_s = frames / fps if fps > 0 else 0
+            # Guess night from hour
+            is_night = recorded_at.hour < 6 or recorded_at.hour >= 21
+            cap.release()
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"metadata error: {e}"}), 500
+
+    # Insert into database
+    try:
+        recording_id = db.insert_recording(
+            filename    = os.path.abspath(filename),
+            camera_name = "Camera1",
+            recorded_at = recorded_at,
+            duration_s  = duration_s,
+            frame_width = frame_w, frame_height = frame_h,
+            fps         = fps,
+            is_night    = bool(is_night),
+        )
+        for v in vehicles:
+            vehicle_id = db.insert_vehicle(
+                recording_id  = recording_id,
+                zone          = v.get("zone", "main"),
+                direction     = v.get("direction", "unknown"),
+                speed_kmh     = v.get("speed_kmh", 0.0),
+                vehicle_class = v.get("vehicle_class", "unknown"),
+                confidence    = v.get("confidence"),
+                track_frames  = v.get("track_frames", 0),
+                duration_s    = v.get("duration_s", 0.0),
+                first_seen_ms = v.get("first_seen_ms", 0),
+                last_seen_ms  = v.get("last_seen_ms", 0),
+                thumbnail_path = None,
+                detected_at   = recorded_at,
+            )
+            if v.get("track_points"):
+                db.insert_track_points(vehicle_id, v["track_points"])
+
+        db.update_recording_count(recording_id, len(vehicles))
+        db.job_complete(job_id, worker_id)
+
+        return jsonify({"ok": True, "recording_id": recording_id,
+                        "vehicles": len(vehicles)})
+
+    except Exception as e:
+        db.job_fail(job_id, worker_id, str(e))
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/jobs/fail", methods=["POST"])
+def api_jobs_fail():
+    """
+    Release or fail a job.
+    POST body: { "job_id": int, "worker_id": str, "reason": str }
+    If reason is "dry_run" or "download_failed", job is released back to pending.
+    Otherwise it is marked failed.
+    """
+    data      = request.json or {}
+    job_id    = data.get("job_id")
+    worker_id = data.get("worker_id", "unknown")
+    reason    = data.get("reason", "")
+
+    if not job_id:
+        return jsonify({"ok": False, "error": "missing job_id"}), 400
+
+    try:
+        if reason in ("dry_run", "download_failed"):
+            db.job_release(job_id, worker_id)
+        else:
+            db.job_fail(job_id, worker_id, reason)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/jobs/status")
+def api_jobs_status():
+    """Return job queue status counts."""
+    try:
+        return jsonify(db.job_queue_status())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
