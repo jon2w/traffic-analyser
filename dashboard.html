@@ -814,19 +814,12 @@ async function loadOverview() {
         const idx = elements[0].index;
         const d = daily[idx];
         // Switch to Daily view filtered to this single day
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        const tab = document.querySelector('[data-view="daily"]');
-        tab.classList.add('active');
-        state.view = 'daily';
-        document.getElementById('view-daily').classList.add('active');
-        // Set dates to just this day
         state.from = d.date;
         state.to   = d.date;
         document.getElementById('date-from').value = d.date;
         document.getElementById('date-to').value   = d.date;
         document.querySelectorAll('.shortcut').forEach(b => b.classList.remove('active'));
-        loadAll();
+        switchView('daily');
       },
       onHover: (evt, elements) => {
         evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
@@ -1258,15 +1251,32 @@ document.getElementById('date-to').addEventListener('change', e => {
   loadAll();
 });
 
+function switchView(viewName, pushHistory = true) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const tab = document.querySelector(`[data-view="${viewName}"]`);
+  if (tab) tab.classList.add('active');
+  state.view = viewName;
+  document.getElementById('view-' + viewName).classList.add('active');
+  if (pushHistory) {
+    history.pushState({ view: viewName, from: state.from, to: state.to }, '', '#' + viewName);
+  }
+  loadAll();
+}
+
 document.querySelectorAll('.nav-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    tab.classList.add('active');
-    state.view = tab.dataset.view;
-    document.getElementById('view-' + state.view).classList.add('active');
-    loadAll();
-  });
+  tab.addEventListener('click', () => switchView(tab.dataset.view));
+});
+
+window.addEventListener('popstate', e => {
+  if (e.state && e.state.view) {
+    if (e.state.from) { state.from = e.state.from; document.getElementById('date-from').value = state.from; }
+    if (e.state.to)   { state.to   = e.state.to;   document.getElementById('date-to').value   = state.to; }
+    switchView(e.state.view, false);
+  } else {
+    // No more history — push them back in rather than leaving the page
+    history.pushState({ view: state.view, from: state.from, to: state.to }, '', '#' + state.view);
+  }
 });
 
 document.getElementById('filter-zone').addEventListener('change', e => {
@@ -1284,6 +1294,8 @@ document.getElementById('filter-direction').addEventListener('change', e => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 setDates(14);
 loadZones();
+// Push initial history entry so back button has somewhere to go
+history.replaceState({ view: 'overview', from: state.from, to: state.to }, '', '#overview');
 loadAll();
 </script>
 </body>
