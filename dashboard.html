@@ -544,6 +544,11 @@
         <div class="chart-wrap"><canvas id="chart-speed-dist" height="200"></canvas></div>
       </div>
     </div>
+    <div class="chart-card" style="margin-top:1.2rem">
+      <div class="chart-title">Hourly Profile by Day of Week</div>
+      <div class="chart-subtitle">Vehicles per hour — each line is a day of the week</div>
+      <div class="chart-wrap"><canvas id="chart-hourly-dow" height="180"></canvas></div>
+    </div>
   </div>
 
   <!-- ── Daily ── -->
@@ -743,11 +748,12 @@ async function loadAll() {
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 async function loadOverview() {
-  const [summary, daily, hourly, speed] = await Promise.all([
+  const [summary, daily, hourly, speed, dowHourly] = await Promise.all([
     api('/api/summary'),
     api('/api/daily'),
     api('/api/hourly'),
-    api('/api/speed_distribution')
+    api('/api/speed_distribution'),
+    api('/api/hourly_by_dow')
   ]);
 
   // Summary cards
@@ -890,6 +896,37 @@ async function loadOverview() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: baseScales('km/h', 'Vehicles')
+    }
+  });
+
+  // Hourly by day of week
+  const dowColors = ['#e8541a','#2d6a9f','#2a9d5c','#f0a500','#9b3fbf','#e05c9e','#3db8d4'];
+  const hourLabels = Array.from({length:24}, (_, h) => `${String(h).padStart(2,'0')}:00`);
+  makeChart('chart-hourly-dow', {
+    type: 'line',
+    data: {
+      labels: hourLabels,
+      datasets: dowHourly.map((d, i) => ({
+        label: d.day_name,
+        data: d.hours,
+        borderColor: dowColors[i % dowColors.length],
+        backgroundColor: 'transparent',
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        tension: 0.4
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: baseFont, usePointStyle: true, pointStyleWidth: 16, padding: 16 }
+        }
+      },
+      scales: baseScales('Hour', 'Vehicles'),
+      interaction: { mode: 'index', intersect: false }
     }
   });
 }
