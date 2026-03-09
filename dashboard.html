@@ -565,6 +565,11 @@
         <div class="chart-wrap"><canvas id="chart-day-night" height="200"></canvas></div>
       </div>
     </div>
+    <div class="chart-card" style="margin-top:1.2rem">
+      <div class="chart-title">Traffic by Hour</div>
+      <div class="chart-subtitle">Vehicle counts by hour of day for selected period</div>
+      <div class="chart-wrap"><canvas id="chart-daily-hourly" height="160"></canvas></div>
+    </div>
   </div>
 
   <!-- ── Weekly ── -->
@@ -965,6 +970,27 @@ async function loadDaily() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'top', labels: { font: baseFont } } },
       scales: { ...baseScales(), x: { ...baseScales().x, stacked: true }, y: { ...baseScales().y, stacked: true } }
+    }
+  });
+
+  // Hourly chart
+  const hourly = await api('/api/hourly');
+  makeChart('chart-daily-hourly', {
+    type: 'bar',
+    data: {
+      labels: hourly.map(h => `${String(h.hour).padStart(2,'0')}:00`),
+      datasets: [{
+        data: hourly.map(h => h.total),
+        backgroundColor: COLORS[1] + 'bb',
+        borderColor: COLORS[1],
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('Hour', 'Vehicles')
     }
   });
 }
