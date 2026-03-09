@@ -790,8 +790,47 @@ async function loadOverview() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: baseScales()
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => items[0].label.join(' ')
+          }
+        }
+      },
+      scales: {
+        ...baseScales(),
+        x: {
+          ...baseScales().x,
+          ticks: {
+            font: baseFont,
+            color: '#8a8076',
+            maxRotation: 0,
+          }
+        }
+      },
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        const d = daily[idx];
+        // Switch to Daily view filtered to this single day
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        const tab = document.querySelector('[data-view="daily"]');
+        tab.classList.add('active');
+        state.view = 'daily';
+        document.getElementById('view-daily').classList.add('active');
+        // Set dates to just this day
+        state.from = d.date;
+        state.to   = d.date;
+        document.getElementById('date-from').value = d.date;
+        document.getElementById('date-to').value   = d.date;
+        document.querySelectorAll('.shortcut').forEach(b => b.classList.remove('active'));
+        loadAll();
+      },
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+      }
     }
   });
 
@@ -865,7 +904,7 @@ async function loadDaily() {
   makeChart('chart-daily-stacked', {
     type: 'bar',
     data: {
-      labels: daily.map(d => fmtDate(d.date)),
+      labels: daily.map(d => fmtDateStr(d.date)),
       datasets: [
         {
           label: '→ Right',
@@ -892,7 +931,7 @@ async function loadDaily() {
   makeChart('chart-daily-speed', {
     type: 'line',
     data: {
-      labels: daily.map(d => fmtDate(d.date)),
+      labels: daily.map(d => fmtDateStr(d.date)),
       datasets: [{
         label: 'Avg Speed',
         data: daily.map(d => d.avg_speed),
@@ -915,7 +954,7 @@ async function loadDaily() {
   makeChart('chart-day-night', {
     type: 'bar',
     data: {
-      labels: daily.map(d => fmtDate(d.date)),
+      labels: daily.map(d => fmtDateStr(d.date)),
       datasets: [
         {
           label: 'Day',
@@ -1167,6 +1206,13 @@ async function loadZones() {
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 function fmtDate(s) {
+  const d = new Date(s);
+  const day = d.toLocaleDateString('en-GB', { weekday: 'short' });
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return [day, date];
+}
+
+function fmtDateStr(s) {
   const d = new Date(s);
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
