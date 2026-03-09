@@ -251,15 +251,6 @@ def api_speed_distribution():
     return jsonify([{k: int(v) if v is not None else 0 for k, v in row.items()} for row in rows])
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=5003)
-    parser.add_argument("--host", default="0.0.0.0")
-    args = parser.parse_args()
-    print(f"Traffic Dashboard running at http://{args.host}:{args.port}")
-    app.run(host=args.host, port=args.port, debug=False)
 
 
 @app.route("/api/hourly_by_dow")
@@ -295,3 +286,14 @@ def api_hourly_by_dow():
                 'hours': by_dow[dow]['hours']
             })
     return jsonify(result)
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=5003)
+    parser.add_argument("--host", default="0.0.0.0")
+    args = parser.parse_args()
+    print(f"Traffic Dashboard running at http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=False)
+
