@@ -78,6 +78,17 @@ CREATE TABLE IF NOT EXISTS track_points (
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
     INDEX idx_vehicle_id (vehicle_id)
 );
+
+CREATE TABLE IF NOT EXISTS job_locks (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    filename    VARCHAR(512) NOT NULL UNIQUE,
+    worker_id   VARCHAR(128),
+    locked_at   DATETIME,
+    status      ENUM('pending','processing','done','failed') DEFAULT 'pending',
+    fail_reason VARCHAR(512),
+    INDEX idx_status (status),
+    INDEX idx_locked_at (locked_at)
+);
 """
 
 
@@ -231,12 +242,138 @@ def get_summary(days=7):
         return cursor.fetchone()
 
 
+# ─── Job queue operations ─────────────────────────────────────────────────────
+
+# Locks older than this are considered stale and can be reclaimed
+JOB_LOCK_STALE_MINUTES = 15
+
+
+def job_queue_populate(recordings_root, camera=None):
+    """
+    Populate job_locks with all unprocessed recordings not already in the queue.
+    Safe to call repeatedly — uses INSERT IGNORE to skip existing entries.
+    Returns count of new jobs added.
+    """
+    import os
+    added = 0
+    camera_dirs = [camera] if camera else sorted(os.listdir(recordings_root))
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        for cam in camera_dirs:
+            cam_path = os.path.join(recordings_root, cam)
+            if not os.path.isdir(cam_path):
+                continue
+            for date_dir in sorted(os.listdir(cam_path)):
+                date_path = os.path.join(cam_path, date_dir)
+                if not os.path.isdir(date_path):
+                    continue
+                for fname in sorted(os.listdir(date_path)):
+                    if not fname.lower().endswith(".mp4"):
+                        continue
+                    full = os.path.abspath(os.path.join(date_path, fname))
+                    # Skip if already processed in recordings table
+                    cursor.execute(
+                        "SELECT id FROM recordings WHERE filename=%s AND processed_at IS NOT NULL",
+                        (full,)
+                    )
+                    if cursor.fetchone():
+                        continue
+                    cursor.execute(
+                        "INSERT IGNORE INTO job_locks (filename, status) VALUES (%s, 'pending')",
+                        (full,)
+                    )
+                    if cursor.rowcount:
+                        added += 1
+    return added
+
+
+def job_claim_next(worker_id):
+    """
+    Atomically claim the next pending job for a worker.
+    Also reclaims stale 'processing' jobs (locked > JOB_LOCK_STALE_MINUTES ago).
+    Returns (job_id, filename) or (None, None) if nothing available.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        # Reclaim stale locks first
+        cursor.execute("""
+            UPDATE job_locks
+            SET status='pending', worker_id=NULL, locked_at=NULL
+            WHERE status='processing'
+              AND locked_at < DATE_SUB(NOW(), INTERVAL %s MINUTE)
+        """, (JOB_LOCK_STALE_MINUTES,))
+
+        # Claim next pending job atomically
+        cursor.execute("""
+            UPDATE job_locks
+            SET status='processing', worker_id=%s, locked_at=NOW()
+            WHERE status='pending'
+            ORDER BY id
+            LIMIT 1
+        """, (worker_id,))
+
+        if cursor.rowcount == 0:
+            return None, None
+
+        cursor.execute(
+            "SELECT id, filename FROM job_locks WHERE worker_id=%s AND status='processing' ORDER BY locked_at DESC LIMIT 1",
+            (worker_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            return row[0], row[1]
+        return None, None
+
+
+def job_complete(job_id, worker_id):
+    """Mark a job as done."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE job_locks SET status='done' WHERE id=%s AND worker_id=%s",
+            (job_id, worker_id)
+        )
+
+
+def job_fail(job_id, worker_id, reason=""):
+    """Mark a job as failed so it can be retried or inspected."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE job_locks SET status='failed', fail_reason=%s WHERE id=%s AND worker_id=%s",
+            (reason[:512], job_id, worker_id)
+        )
+
+
+def job_release(job_id, worker_id):
+    """Release a job back to pending (e.g. dry-run or download failure)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE job_locks SET status='pending', worker_id=NULL, locked_at=NULL WHERE id=%s AND worker_id=%s",
+            (job_id, worker_id)
+        )
+
+
+def job_queue_status():
+    """Return dict of status counts for the job queue."""
+    with get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT status, COUNT(*) as count
+            FROM job_locks GROUP BY status
+        """)
+        return {row["status"]: row["count"] for row in cursor.fetchall()}
+
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--setup",  action="store_true",
                         help="Create database, user and tables")
+    parser.add_argument("--setup-jobs", action="store_true",
+                        help="Add job_locks table to existing database")
     parser.add_argument("--root-password", default="",
                         help="MariaDB root password for --setup")
     parser.add_argument("--status", action="store_true",
@@ -245,6 +382,24 @@ if __name__ == "__main__":
 
     if args.setup:
         setup(args.root_password)
+
+    if args.setup_jobs:
+        print("Adding job_locks table...")
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS job_locks (
+                    id          INT AUTO_INCREMENT PRIMARY KEY,
+                    filename    VARCHAR(512) NOT NULL UNIQUE,
+                    worker_id   VARCHAR(128),
+                    locked_at   DATETIME,
+                    status      ENUM('pending','processing','done','failed') DEFAULT 'pending',
+                    fail_reason VARCHAR(512),
+                    INDEX idx_status (status),
+                    INDEX idx_locked_at (locked_at)
+                )
+            """)
+        print("Done.")
 
     if args.status:
         with get_connection() as conn:
