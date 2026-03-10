@@ -352,6 +352,13 @@
   }
   .rec-link:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
 
+  .rec-dl {
+    color: var(--accent3);
+    background: #f0faf4;
+    border-color: #c0e8d0;
+  }
+  .rec-dl:hover { background: var(--accent3); color: #fff; border-color: var(--accent3); }
+
   .rec-note {
     font-size: 0.68rem;
     color: var(--muted);
@@ -609,6 +616,10 @@ function renderTable(data) {
               <a class="rec-link" href="${WEB_UI}" target="_blank"
                  title="Open web UI — then select: ${rec.filename}">
                 Open web UI ↗
+              </a>
+              <a class="rec-link rec-dl" href="/api/download?path=${encodeURIComponent(rec.filename)}"
+                 download="${rec.basename}" title="Download raw recording">
+                ⬇ Download
               </a>
             </div>
           `).join('')}

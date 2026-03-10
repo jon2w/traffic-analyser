@@ -18,7 +18,7 @@ Serves:
 import argparse
 import os
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 
 from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 
@@ -29,7 +29,9 @@ except ImportError:
 
 app = Flask(__name__, static_folder="static")
 
-DASHBOARD_DIR = os.path.dirname(os.path.abspath(__file__))
+DASHBOARD_DIR    = os.path.dirname(os.path.abspath(__file__))
+RECORDINGS_ROOT  = "/volume1/traffic/recordings"
+ANNOTATED_ROOT   = "/volume1/traffic/annotated"
 
 
 def _connect():
@@ -74,6 +76,24 @@ def dow():
 @app.route("/busiest")
 def busiest():
     return send_from_directory(DASHBOARD_DIR, "busiest.html")
+
+@app.route("/api/download")
+def api_download():
+    """Stream a raw recording file for local download.
+    Only serves files that live under RECORDINGS_ROOT as a safety check."""
+    path = request.args.get("path", "")
+    if not path:
+        return "Missing path", 400
+    # Resolve symlinks and normalise to prevent path traversal
+    real = os.path.realpath(os.path.abspath(path))
+    root = os.path.realpath(RECORDINGS_ROOT)
+    if not real.startswith(root + os.sep):
+        return "Forbidden", 403
+    if not os.path.isfile(real):
+        return "Not found", 404
+    return send_file(real, mimetype="video/mp4",
+                     as_attachment=True,
+                     download_name=os.path.basename(real))
 
 
 # ── API ───────────────────────────────────────────────────────────────────────
