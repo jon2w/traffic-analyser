@@ -67,6 +67,10 @@ def _parse_dates():
 def index():
     return send_from_directory(DASHBOARD_DIR, "dashboard.html")
 
+@app.route("/dow")
+def dow():
+    return send_from_directory(DASHBOARD_DIR, "dow.html")
+
 
 # ── API ───────────────────────────────────────────────────────────────────────
 
@@ -298,3 +302,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Traffic Dashboard running at http://{args.host}:{args.port}")
     app.run(host=args.host, port=args.port, debug=False)
+
