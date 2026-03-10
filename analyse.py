@@ -341,7 +341,7 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
         fps_actual = 0.9 * fps_actual + 0.1 * (1.0 / max(now - t_prev, 1e-6))
         t_prev     = now
 
-        annotated = draw_overlay(frame.copy(), zone_trackers,
+        annotated = draw_overlay(debug_frame, zone_trackers,
                                  night_mode, fps_actual, frame_w, frame_h)
         if writer:
             writer.write(annotated)
