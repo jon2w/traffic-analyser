@@ -258,10 +258,11 @@ def api_hourly_by_dow():
     date_from, date_to = _parse_dates()
     rows = _query("""
         SELECT
-            DAYOFWEEK(r.recorded_at)   AS dow,
-            DAYNAME(r.recorded_at)     AS day_name,
-            HOUR(r.recorded_at)        AS hour,
-            COUNT(*)                   AS total
+            DAYOFWEEK(r.recorded_at)                        AS dow,
+            DAYNAME(r.recorded_at)                          AS day_name,
+            HOUR(r.recorded_at)                             AS hour,
+            COUNT(*)                                        AS total,
+            COUNT(DISTINCT DATE(r.recorded_at))             AS day_count
         FROM vehicles v
         JOIN recordings r ON v.recording_id = r.id
         WHERE r.recorded_at >= %s AND r.recorded_at < %s
@@ -275,7 +276,8 @@ def api_hourly_by_dow():
         dow  = int(row['dow'])
         hour = int(row['hour'])
         by_dow[dow]['day_name'] = row['day_name']
-        by_dow[dow]['hours'][hour] = int(row['total'])
+        day_count = int(row['day_count']) or 1
+        by_dow[dow]['hours'][hour] = round(int(row['total']) / day_count)
 
     result = []
     for dow in [2,3,4,5,6,7,1]:  # Mon-Sun (DAYOFWEEK: 1=Sun, 2=Mon ... 7=Sat)
@@ -296,4 +298,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Traffic Dashboard running at http://{args.host}:{args.port}")
     app.run(host=args.host, port=args.port, debug=False)
-
