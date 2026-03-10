@@ -498,12 +498,12 @@ function renderPeakTable() {
     const eveningPeak  = Math.max(...eveningSlice);
     const eveningHour  = eveningSlice.indexOf(eveningPeak) + 14;
 
-    // Quietest (6–22)
-    const daySlice    = d.hours.slice(6, 23);
-    const quietest    = Math.min(...daySlice);
-    const quietHour   = daySlice.indexOf(quietest) + 6;
+    // Quietest (full 24h)
+    const quietest  = Math.min(...d.hours);
+    const quietHour = d.hours.indexOf(quietest);
 
     // Avg 6–22
+    const daySlice = d.hours.slice(6, 23);
     const avg = Math.round(daySlice.reduce((a,b) => a+b, 0) / daySlice.length);
 
     // Peak vs avg ratio (use higher of morning/evening)
