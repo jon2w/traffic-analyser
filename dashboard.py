@@ -80,20 +80,23 @@ def busiest():
 @app.route("/api/download")
 def api_download():
     """Stream a raw recording file for local download.
-    Only serves files that live under RECORDINGS_ROOT as a safety check."""
+    Validates the path is a known recording in the DB rather than relying
+    on filesystem path comparisons (which break on Synology due to symlinks)."""
     path = request.args.get("path", "")
     if not path:
         return "Missing path", 400
-    # Resolve symlinks and normalise to prevent path traversal
-    real = os.path.realpath(os.path.abspath(path))
-    root = os.path.realpath(RECORDINGS_ROOT)
-    if not real.startswith(root + os.sep):
-        return "Forbidden", 403
-    if not os.path.isfile(real):
-        return "Not found", 404
-    return send_file(real, mimetype="video/mp4",
+
+    # Check the path exists in the recordings table — this is the safety gate
+    rows = _query("SELECT filename FROM recordings WHERE filename = %s LIMIT 1", (path,))
+    if not rows:
+        return "Not found — path not in recordings database", 404
+
+    if not os.path.isfile(path):
+        return "Not found — file missing on disk", 404
+
+    return send_file(path, mimetype="video/mp4",
                      as_attachment=True,
-                     download_name=os.path.basename(real))
+                     download_name=os.path.basename(path))
 
 
 # ── API ───────────────────────────────────────────────────────────────────────
