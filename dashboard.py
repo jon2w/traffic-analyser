@@ -361,7 +361,7 @@ def api_busiest_periods():
     best.sort(key=lambda x: -x[0])
     results = []
     used_ranges = []
-    for count, t_start, t_end, filename, rec_id in best:
+    for count, t_start, t_end, _filename, _rec_id in best:
         # Skip if this window overlaps an already-selected one
         overlaps = any(
             not (t_end < us or t_start > ue)
@@ -370,13 +370,24 @@ def api_busiest_periods():
         if overlaps:
             continue
         used_ranges.append((t_start, t_end))
+
+        # Collect all distinct recordings whose vehicles fall inside this window
+        seen_recs = {}
+        for ts, rid, fn in events:
+            if t_start <= ts <= t_end + window_td:
+                if rid not in seen_recs:
+                    seen_recs[rid] = fn
+        recordings = [
+            {'filename': fn, 'basename': os.path.basename(fn)}
+            for rid, fn in sorted(seen_recs.items())
+        ]
+
         results.append({
-            'rank':       len(results) + 1,
-            'count':      count,
+            'rank':         len(results) + 1,
+            'count':        count,
             'window_start': t_start.strftime('%Y-%m-%d %H:%M:%S'),
             'window_end':   t_end.strftime('%Y-%m-%d %H:%M:%S'),
-            'filename':   filename,
-            'recording_id': rec_id,
+            'recordings':   recordings,
         })
         if len(results) >= limit:
             break

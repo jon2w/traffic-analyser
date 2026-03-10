@@ -303,26 +303,60 @@
     white-space: nowrap;
   }
 
-  /* ── Recording link ── */
-  .rec-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
+  /* ── Recording expand ── */
+  .rec-toggle {
+    font-family: 'DM Sans', sans-serif;
     font-size: 0.75rem;
     color: var(--accent2);
-    text-decoration: none;
-    padding: 0.2rem 0.55rem;
+    background: #f0f6fd;
     border: 1px solid #d0e0f0;
     border-radius: 6px;
-    background: #f0f6fd;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
   }
+  .rec-toggle:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .rec-toggle.open  { background: var(--accent2); color: #fff; border-color: var(--accent2); }
 
-  .rec-link:hover {
-    background: var(--accent2);
-    color: #fff;
-    border-color: var(--accent2);
+  .rec-list {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .rec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .rec-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .rec-link {
+    font-size: 0.72rem;
+    color: var(--accent2);
+    text-decoration: none;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid #d0e0f0;
+    border-radius: 5px;
+    background: #f0f6fd;
+    white-space: nowrap;
+    transition: all 0.12s;
+  }
+  .rec-link:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  .rec-note {
+    font-size: 0.68rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 0.1rem;
   }
 
   /* ── Loading / empty ── */
@@ -548,7 +582,6 @@ function renderTable(data) {
     const rankClass = r.rank === 1 ? 'gold' : r.rank === 2 ? 'silver' : r.rank === 3 ? 'bronze' : '';
     const barPct    = Math.round((r.count / maxCount) * 100);
     const endTime   = windowEndLabel(r.window_start, currentMinutes);
-    const recLink   = `${WEB_UI}/?path=${encodeURIComponent(r.filename)}`;
 
     return `<tr>
       <td><span class="rank ${rankClass}">${r.rank}</span></td>
@@ -566,9 +599,21 @@ function renderTable(data) {
         </div>
       </td>
       <td>
-        <a class="rec-link" href="${recLink}" target="_blank" title="${r.filename}">
-          ▶ Recording
-        </a>
+        <button class="rec-toggle" onclick="toggleRecs(this)">
+          ${r.recordings.length} recording${r.recordings.length !== 1 ? 's' : ''} ▾
+        </button>
+        <div class="rec-list" style="display:none">
+          ${r.recordings.map(rec => `
+            <div class="rec-item">
+              <span class="rec-name">${rec.basename}</span>
+              <a class="rec-link" href="${WEB_UI}" target="_blank"
+                 title="Open web UI — then select: ${rec.filename}">
+                Open web UI ↗
+              </a>
+            </div>
+          `).join('')}
+          <div class="rec-note">Copy filename to locate in web UI</div>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -581,12 +626,21 @@ function renderTable(data) {
           <th>Date &amp; Time</th>
           <th>Day</th>
           <th>Vehicles</th>
-          <th>Recording</th>
+          <th>Recordings</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+// ── Toggle recordings list ───────────────────────────────────────────────────
+function toggleRecs(btn) {
+  const list = btn.nextElementSibling;
+  const open = list.style.display === 'none';
+  list.style.display = open ? 'flex' : 'none';
+  btn.classList.toggle('open', open);
+  btn.textContent = btn.textContent.replace(open ? '▾' : '▴', open ? '▴' : '▾');
 }
 
 // ── Load ─────────────────────────────────────────────────────────────────────
