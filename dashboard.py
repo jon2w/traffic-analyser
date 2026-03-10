@@ -71,6 +71,10 @@ def index():
 def dow():
     return send_from_directory(DASHBOARD_DIR, "dow.html")
 
+@app.route("/busiest")
+def busiest():
+    return send_from_directory(DASHBOARD_DIR, "busiest.html")
+
 
 # ── API ───────────────────────────────────────────────────────────────────────
 
@@ -293,7 +297,94 @@ def api_hourly_by_dow():
             })
     return jsonify(result)
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+@app.route("/api/busiest_periods")
+def api_busiest_periods():
+    """
+    Returns the top N busiest time windows of a given duration.
+    Counts vehicles whose recorded_at falls within each window.
+    Windows are anchored to recording start times to avoid splitting real events.
+
+    Query params:
+      from, to       — date range (YYYY-MM-DD)
+      minutes        — window size in minutes (1,2,5,15,30,60)
+      limit          — number of results (default 50)
+    """
+    date_from, date_to = _parse_dates()
+    minutes = max(1, min(60, int(request.args.get("minutes", 60))))
+    limit   = max(1, min(200, int(request.args.get("limit", 50))))
+
+    # Pull all vehicles with their recording info in the date range
+    rows = _query("""
+        SELECT
+            v.id                AS vehicle_id,
+            r.id                AS recording_id,
+            r.filename          AS filename,
+            r.recorded_at       AS window_start,
+            r.recorded_at       AS rec_start,
+            v.first_seen_ms     AS first_seen_ms
+        FROM vehicles v
+        JOIN recordings r ON v.recording_id = r.id
+        WHERE r.recorded_at >= %s AND r.recorded_at < %s
+        ORDER BY r.recorded_at, v.first_seen_ms
+    """, (date_from, date_to))
+
+    if not rows:
+        return jsonify([])
+
+    from datetime import timedelta
+
+    # Build list of (absolute_timestamp, recording_id, filename)
+    events = []
+    for row in rows:
+        base = row['rec_start']
+        offset_ms = row['first_seen_ms'] or 0
+        ts = base + timedelta(milliseconds=offset_ms)
+        events.append((ts, row['recording_id'], row['filename']))
+
+    events.sort(key=lambda x: x[0])
+
+    # Sliding window count — advance right pointer
+    window_td = timedelta(minutes=minutes)
+    best = []
+    n = len(events)
+    left = 0
+    for right in range(n):
+        ts_right = events[right][0]
+        # shrink left until window fits
+        while events[left][0] < ts_right - window_td:
+            left += 1
+        count = right - left + 1
+        best.append((count, events[left][0], events[right][0],
+                     events[left][2], events[left][1]))
+
+    # Deduplicate overlapping windows — keep highest count per non-overlapping slot
+    best.sort(key=lambda x: -x[0])
+    results = []
+    used_ranges = []
+    for count, t_start, t_end, filename, rec_id in best:
+        # Skip if this window overlaps an already-selected one
+        overlaps = any(
+            not (t_end < us or t_start > ue)
+            for us, ue in used_ranges
+        )
+        if overlaps:
+            continue
+        used_ranges.append((t_start, t_end))
+        results.append({
+            'rank':       len(results) + 1,
+            'count':      count,
+            'window_start': t_start.strftime('%Y-%m-%d %H:%M:%S'),
+            'window_end':   t_end.strftime('%Y-%m-%d %H:%M:%S'),
+            'filename':   filename,
+            'recording_id': rec_id,
+        })
+        if len(results) >= limit:
+            break
+
+    return jsonify(results)
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
