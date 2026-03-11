@@ -420,6 +420,60 @@ def api_busiest_periods():
 
 
 
+@app.route("/speeds")
+def speeds():
+    return send_from_directory(DASHBOARD_DIR, "speeds.html")
+
+@app.route("/api/top_speeds")
+def api_top_speeds():
+    """Return the top N fastest vehicle records with recording info."""
+    date_from, date_to = _parse_dates()
+    limit = max(1, min(200, int(request.args.get("limit", 100))))
+
+    rows = _query("""
+        SELECT
+            v.id            AS vehicle_id,
+            v.speed_kmh     AS speed_kmh,
+            v.vehicle_class AS vehicle_class,
+            v.direction     AS direction,
+            v.zone          AS zone,
+            v.confidence    AS confidence,
+            v.track_frames  AS track_frames,
+            v.duration_s    AS duration_s,
+            r.id            AS recording_id,
+            r.filename      AS filename,
+            r.recorded_at   AS recorded_at,
+            r.is_night      AS is_night
+        FROM vehicles v
+        JOIN recordings r ON v.recording_id = r.id
+        WHERE r.recorded_at >= %s AND r.recorded_at < %s
+          AND v.speed_kmh IS NOT NULL
+        ORDER BY v.speed_kmh DESC
+        LIMIT %s
+    """, (date_from, date_to, limit))
+
+    return jsonify([{
+        k: (str(v) if hasattr(v, 'isoformat') else
+            float(v) if v is not None and hasattr(v, '__float__') else
+            bool(v) if k == 'is_night' else v)
+        for k, v in row.items()
+    } for row in rows])
+
+
+@app.route("/api/vehicles/<int:vehicle_id>", methods=["DELETE"])
+def api_delete_vehicle(vehicle_id):
+    """Delete a single vehicle record by ID."""
+    try:
+        with _connect() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM vehicles WHERE id = %s", (vehicle_id,))
+            if cur.rowcount == 0:
+                return jsonify({"ok": False, "error": "Not found"}), 404
+        return jsonify({"ok": True, "deleted": vehicle_id})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5003)
