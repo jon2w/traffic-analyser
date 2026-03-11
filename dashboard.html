@@ -541,9 +541,14 @@
         <div class="chart-wrap"><canvas id="chart-hourly" height="200"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Speed Distribution</div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem">
+          <div class="chart-title">Speed Distribution</div>
+          <a href="/speeds" style="font-size:0.75rem;color:var(--muted);text-decoration:none;white-space:nowrap" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Top speeds ↗</a>
+        </div>
         <div class="chart-subtitle">Vehicle counts by speed band (km/h)</div>
-        <div class="chart-wrap"><canvas id="chart-speed-dist" height="200"></canvas></div>
+        <div class="chart-wrap" style="cursor:pointer" onclick="window.location.href='/speeds'" title="View top speeds">
+          <canvas id="chart-speed-dist" height="200"></canvas>
+        </div>
       </div>
     </div>
     <div class="chart-card" style="margin-top:1.2rem">
