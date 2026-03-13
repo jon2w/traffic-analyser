@@ -584,7 +584,7 @@
     </div>
     <div class="chart-card" style="margin-top:1.2rem">
       <div class="chart-title">Traffic by Hour</div>
-      <div class="chart-subtitle">Vehicle counts by hour of day for selected period</div>
+      <div class="chart-subtitle">Average vehicles per hour across selected period</div>
       <div class="chart-wrap"><canvas id="chart-daily-hourly" height="160"></canvas></div>
     </div>
   </div>
@@ -626,7 +626,7 @@
     </div>
     <div class="chart-card">
       <div class="chart-title">24-Hour Traffic Profile</div>
-      <div class="chart-subtitle">Vehicles by hour of day (total across period)</div>
+      <div class="chart-subtitle">Average vehicles per hour across selected period</div>
       <div class="chart-wrap"><canvas id="chart-hourly-full" height="160"></canvas></div>
     </div>
   </div>
@@ -798,16 +798,16 @@ async function loadOverview() {
     </div>
   `;
 
-  // Daily bar
+  // Daily bar — gap days shown in amber with hatching via per-bar colour
   makeChart('chart-daily-bar', {
     type: 'bar',
     data: {
       labels: daily.map(d => fmtDate(d.date)),
       datasets: [{
         data: daily.map(d => d.total),
-        backgroundColor: COLORS[0] + 'cc',
-        borderColor: COLORS[0],
-        borderWidth: 1,
+        backgroundColor: daily.map(d => d.has_gap ? '#f0a50099' : COLORS[0] + 'cc'),
+        borderColor:     daily.map(d => d.has_gap ? '#f0a500'   : COLORS[0]),
+        borderWidth: daily.map(d => d.has_gap ? 2 : 1),
         borderRadius: 4,
       }]
     },
@@ -817,7 +817,13 @@ async function loadOverview() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: items => items[0].label.join(' ')
+            title: items => items[0].label.join ? items[0].label.join(' ') : items[0].label,
+            afterBody: items => {
+              const d = daily[items[0].dataIndex];
+              if (!d.has_gap) return [];
+              const hrs = d.missing_hours.map(h => `${String(h).padStart(2,'0')}:00`);
+              return [`⚠ Possible missing data`, `Low traffic: ${hrs.join(', ')}`];
+            }
           }
         }
       },
@@ -827,7 +833,10 @@ async function loadOverview() {
           ...baseScales().x,
           ticks: {
             font: baseFont,
-            color: '#8a8076',
+            color: ctx => {
+              const d = daily[ctx.index];
+              return d && d.has_gap ? '#f0a500' : '#8a8076';
+            },
             maxRotation: 0,
           }
         }

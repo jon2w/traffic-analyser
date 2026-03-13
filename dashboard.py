@@ -141,9 +141,64 @@ def api_daily():
         GROUP BY DATE(r.recorded_at)
         ORDER BY date
     """, (date_from, date_to))
-    return jsonify([{k: (str(v) if hasattr(v, 'isoformat') else
-                        float(v) if v is not None and hasattr(v, '__float__') else v)
-                    for k, v in row.items()} for row in rows])
+
+    # Per-hour breakdown per day to detect missing data gaps
+    # Only look at daytime hours (6-22) to avoid night lows triggering false positives
+    hourly_rows = _query("""
+        SELECT
+            DATE(r.recorded_at)  AS date,
+            HOUR(r.recorded_at)  AS hour,
+            COUNT(*)             AS cnt
+        FROM vehicles v
+        JOIN recordings r ON v.recording_id = r.id
+        WHERE r.recorded_at >= %s AND r.recorded_at < %s
+          AND HOUR(r.recorded_at) BETWEEN 6 AND 22
+        GROUP BY DATE(r.recorded_at), HOUR(r.recorded_at)
+    """, (date_from, date_to))
+
+    # Build per-day hourly map
+    from collections import defaultdict
+    day_hours = defaultdict(dict)
+    for hr in hourly_rows:
+        day_hours[str(hr['date'])][int(hr['hour'])] = int(hr['cnt'])
+
+    # Calculate expected hourly average across all days (daytime only)
+    all_counts = [v for dh in day_hours.values() for v in dh.values()]
+    expected_avg = (sum(all_counts) / len(all_counts)) if all_counts else 0
+    threshold = expected_avg * 0.30  # 30% of average = suspect
+
+    result = []
+    for row in rows:
+        date_str = str(row['date'])
+        hours    = day_hours.get(date_str, {})
+
+        # Find any daytime hours that are suspiciously low
+        missing_hours = []
+        for h in range(6, 23):
+            cnt = hours.get(h, 0)
+            if cnt < threshold:
+                missing_hours.append(h)
+
+        # Only flag if 2+ consecutive hours are missing (avoids single quiet spells)
+        has_gap = False
+        consecutive = 0
+        for h in range(6, 23):
+            if h in missing_hours:
+                consecutive += 1
+                if consecutive >= 2:
+                    has_gap = True
+                    break
+            else:
+                consecutive = 0
+
+        d = {k: (str(v) if hasattr(v, 'isoformat') else
+                 float(v) if v is not None and hasattr(v, '__float__') else v)
+             for k, v in row.items()}
+        d['has_gap']      = has_gap
+        d['missing_hours'] = missing_hours if has_gap else []
+        result.append(d)
+
+    return jsonify(result)
 
 
 @app.route("/api/hourly")
@@ -151,20 +206,30 @@ def api_hourly():
     date_from, date_to = _parse_dates()
     rows = _query("""
         SELECT
-            HOUR(r.recorded_at)                     AS hour,
-            COUNT(*)                                AS total,
-            ROUND(AVG(v.speed_kmh), 1)              AS avg_speed
+            HOUR(r.recorded_at)                         AS hour,
+            COUNT(*)                                    AS total,
+            COUNT(DISTINCT DATE(r.recorded_at))         AS day_count,
+            ROUND(AVG(v.speed_kmh), 1)                  AS avg_speed
         FROM vehicles v
         JOIN recordings r ON v.recording_id = r.id
         WHERE r.recorded_at >= %s AND r.recorded_at < %s
         GROUP BY HOUR(r.recorded_at)
         ORDER BY hour
     """, (date_from, date_to))
-    # Fill all 24 hours
+    # Fill all 24 hours, divide total by number of days that had data for that hour
     by_hour = {row["hour"]: row for row in rows}
     result = []
     for h in range(24):
-        result.append(by_hour.get(h, {"hour": h, "total": 0, "avg_speed": None}))
+        row = by_hour.get(h)
+        if row:
+            day_count = int(row["day_count"]) or 1
+            result.append({
+                "hour":      h,
+                "total":     round(int(row["total"]) / day_count),
+                "avg_speed": row["avg_speed"]
+            })
+        else:
+            result.append({"hour": h, "total": 0, "avg_speed": None})
     return jsonify(result)
 
 
