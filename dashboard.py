@@ -156,30 +156,44 @@ def api_daily():
         GROUP BY DATE(r.recorded_at), HOUR(r.recorded_at)
     """, (date_from, date_to))
 
-    # Build per-day hourly map
+    # Build per-day hourly map, also tracking day-of-week
     from collections import defaultdict
-    day_hours = defaultdict(dict)
+    import datetime as dt
+    day_hours = defaultdict(dict)   # date_str -> {hour: count}
+    day_dow   = {}                  # date_str -> weekday 0=Mon
     for hr in hourly_rows:
-        day_hours[str(hr['date'])][int(hr['hour'])] = int(hr['cnt'])
+        date_str = str(hr['date'])
+        day_hours[date_str][int(hr['hour'])] = int(hr['cnt'])
+        if date_str not in day_dow:
+            day_dow[date_str] = hr['date'].weekday() if hasattr(hr['date'], 'weekday') \
+                                else dt.date.fromisoformat(date_str).weekday()
 
-    # Calculate expected hourly average across all days (daytime only)
-    all_counts = [v for dh in day_hours.values() for v in dh.values()]
-    expected_avg = (sum(all_counts) / len(all_counts)) if all_counts else 0
-    threshold = expected_avg * 0.30  # 30% of average = suspect
+    # Calculate expected hourly average per day-of-week (0=Mon … 6=Sun)
+    dow_counts = defaultdict(list)
+    for date_str, hours in day_hours.items():
+        dow = day_dow.get(date_str, 0)
+        dow_counts[dow].extend(hours.values())
+
+    dow_avg = {}
+    for dow, counts in dow_counts.items():
+        dow_avg[dow] = (sum(counts) / len(counts)) if counts else 0
 
     result = []
     for row in rows:
         date_str = str(row['date'])
         hours    = day_hours.get(date_str, {})
+        dow      = day_dow.get(date_str, 0)
+        expected = dow_avg.get(dow, 0)
+        threshold = expected * 0.30
 
-        # Find any daytime hours that are suspiciously low
+        # Find daytime hours below threshold for this day-of-week
         missing_hours = []
         for h in range(6, 23):
             cnt = hours.get(h, 0)
             if cnt < threshold:
                 missing_hours.append(h)
 
-        # Only flag if 2+ consecutive hours are missing (avoids single quiet spells)
+        # Only flag if 2+ consecutive hours are missing
         has_gap = False
         consecutive = 0
         for h in range(6, 23):
