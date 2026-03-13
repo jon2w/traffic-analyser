@@ -152,7 +152,7 @@ def api_daily():
         FROM vehicles v
         JOIN recordings r ON v.recording_id = r.id
         WHERE r.recorded_at >= %s AND r.recorded_at < %s
-          AND HOUR(r.recorded_at) BETWEEN 6 AND 22
+          AND HOUR(r.recorded_at) BETWEEN 8 AND 20
         GROUP BY DATE(r.recorded_at), HOUR(r.recorded_at)
     """, (date_from, date_to))
 
@@ -188,7 +188,7 @@ def api_daily():
 
         # Find daytime hours below threshold for this day-of-week
         missing_hours = []
-        for h in range(6, 23):
+        for h in range(8, 21):
             cnt = hours.get(h, 0)
             if cnt < threshold:
                 missing_hours.append(h)
@@ -196,7 +196,7 @@ def api_daily():
         # Only flag if 2+ consecutive hours are missing
         has_gap = False
         consecutive = 0
-        for h in range(6, 23):
+        for h in range(8, 21):
             if h in missing_hours:
                 consecutive += 1
                 if consecutive >= 2:
