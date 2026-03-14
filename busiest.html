@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Busiest Periods — Traffic Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #f5f2ee;
+    --surface: #fffefb;
+    --border:  #e8e2d9;
+    --text:    #1a1714;
+    --muted:   #8a8076;
+    --accent1: #e8541a;
+    --accent2: #2d6a9f;
+    --accent3: #2a9d5c;
+    --accent4: #f0a500;
+    --accent5: #9b3fbf;
+    --shadow:  0 2px 12px rgba(0,0,0,0.07);
+    --radius:  14px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .header-left a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+  }
+  .header-left a:hover { color: var(--text); }
+
+  .header-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  /* ── Controls bar ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .controls label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .controls input[type="date"] {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .btn-group button, .pill-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    padding: 0.28rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-group button:hover, .pill-btn:hover,
+  .btn-group button.active, .pill-btn.active {
+    background: var(--text);
+    color: #fff;
+    border-color: var(--text);
+  }
+
+  .divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+  /* ── Main layout ── */
+  main {
+    max-width: 1100px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* ── Window tabs ── */
+  .window-tabs {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .window-tab {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0.45rem 1.1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .window-tab:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .window-tab.active {
+    background: var(--accent2);
+    border-color: var(--accent2);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(45,106,159,0.25);
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 1.2rem 1.6rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .card-subtitle {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    white-space: nowrap;
+  }
+
+  thead th.right { text-align: right; }
+
+  tbody tr {
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover { background: #f9f7f4; }
+  tbody tr + tr td { border-top: 1px solid var(--border); }
+
+  tbody td {
+    padding: 0.75rem 1rem;
+    font-size: 0.83rem;
+    vertical-align: middle;
+  }
+
+  tbody td.right { text-align: right; }
+
+  /* ── Rank badge ── */
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .rank.gold   { background: #fff8e6; border-color: #f0a500; color: #b87a00; }
+  .rank.silver { background: #f2f4f7; border-color: #aab0bb; color: #5a6070; }
+  .rank.bronze { background: #fdf3ee; border-color: #c8845a; color: #7a4020; }
+
+  /* ── Count bar ── */
+  .count-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 120px;
+  }
+
+  .count-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    max-width: 100px;
+  }
+
+  .count-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent2);
+    transition: width 0.4s ease;
+  }
+
+  .count-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--text);
+    min-width: 2.5rem;
+  }
+
+  /* ── DateTime ── */
+  .dt-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .dt-date {
+    font-weight: 500;
+  }
+
+  .dt-time {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  /* ── Day badge ── */
+  .day-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ── Recording expand ── */
+  .rec-toggle {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    color: var(--accent2);
+    background: #f0f6fd;
+    border: 1px solid #d0e0f0;
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .rec-toggle:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .rec-toggle.open  { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  .rec-list {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .rec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .rec-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .rec-link {
+    font-size: 0.72rem;
+    color: var(--accent2);
+    text-decoration: none;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid #d0e0f0;
+    border-radius: 5px;
+    background: #f0f6fd;
+    white-space: nowrap;
+    transition: all 0.12s;
+  }
+  .rec-link:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  .rec-dl {
+    color: var(--accent3);
+    background: #f0faf4;
+    border-color: #c0e8d0;
+  }
+  .rec-dl:hover { background: var(--accent3); color: #fff; border-color: var(--accent3); }
+
+  .rec-note {
+    font-size: 0.68rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 0.1rem;
+  }
+
+  /* ── Loading / empty ── */
+  .state-box {
+    padding: 3.5rem 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent2);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-bottom: 0.75rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Summary strip ── */
+  .summary-strip {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .sum-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    box-shadow: var(--shadow);
+  }
+
+  .sum-chip strong {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    color: var(--text);
+    display: block;
+    line-height: 1.1;
+  }
+
+  @media (max-width: 700px) {
+    header { flex-direction: column; height: auto; padding: 0.75rem 1rem; gap: 0.5rem; }
+    .controls { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <a href="/">← Dashboard</a>
+    <span class="header-title">Busiest Periods</span>
+  </div>
+  <div class="controls">
+    <div class="btn-group" id="range-btns">
+      <button onclick="setRange('alltime')" id="btn-alltime">All time</button>
+      <button onclick="setRange('week')"    id="btn-week">Last week</button>
+      <button onclick="setRange('month')"   id="btn-month" class="active">Last month</button>
+      <button onclick="setRange('custom')"  id="btn-custom">Custom</button>
+    </div>
+    <div class="divider" id="date-divider" style="display:none"></div>
+    <label id="date-label-from" style="display:none">From</label>
+    <input type="date" id="date-from" style="display:none" onchange="onCustomDate()">
+    <label id="date-label-to" style="display:none">To</label>
+    <input type="date" id="date-to"   style="display:none" onchange="onCustomDate()">
+  </div>
+</header>
+
+<main>
+  <!-- Window size tabs -->
+  <div class="window-tabs" id="window-tabs">
+    <button class="window-tab" data-mins="1"  onclick="setWindow(1)">1 min</button>
+    <button class="window-tab" data-mins="2"  onclick="setWindow(2)">2 min</button>
+    <button class="window-tab" data-mins="5"  onclick="setWindow(5)">5 min</button>
+    <button class="window-tab" data-mins="15" onclick="setWindow(15)">15 min</button>
+    <button class="window-tab" data-mins="30" onclick="setWindow(30)">30 min</button>
+    <button class="window-tab active" data-mins="60" onclick="setWindow(60)">1 hour</button>
+  </div>
+
+  <!-- Summary chips -->
+  <div class="summary-strip" id="summary-strip"></div>
+
+  <!-- Results table -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title" id="card-title">Busiest 1-hour windows</div>
+        <div class="card-subtitle" id="card-subtitle">Non-overlapping periods ranked by vehicle count</div>
+      </div>
+      <div class="card-subtitle" id="result-count" style="color:var(--muted)"></div>
+    </div>
+    <div id="table-wrap">
+      <div class="state-box"><div class="spinner"></div><br>Loading…</div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const WEB_UI = `http://${window.location.hostname}:5002`;
+let currentMinutes = 60;
+let currentRange   = 'month';
+
+// ── Date helpers ─────────────────────────────────────────────────────────────
+const toISO = d => d.toISOString().slice(0, 10);
+
+function getDateRange() {
+  if (currentRange === 'custom') {
+    return {
+      from: document.getElementById('date-from').value,
+      to:   document.getElementById('date-to').value
+    };
+  }
+  const to   = new Date();
+  const from = new Date();
+  if (currentRange === 'week')    from.setDate(from.getDate() - 7);
+  if (currentRange === 'month')   from.setDate(from.getDate() - 30);
+  if (currentRange === 'alltime') from.setFullYear(2000);
+  return { from: toISO(from), to: toISO(to) };
+}
+
+function setRange(r) {
+  currentRange = r;
+  document.querySelectorAll('#range-btns button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-${r}`).classList.add('active');
+
+  const isCustom = r === 'custom';
+  ['date-divider','date-label-from','date-from','date-label-to','date-to']
+    .forEach(id => document.getElementById(id).style.display = isCustom ? '' : 'none');
+
+  if (isCustom) {
+    // Default custom to last 30d
+    const to   = new Date();
+    const from = new Date(); from.setDate(from.getDate() - 30);
+    document.getElementById('date-from').value = toISO(from);
+    document.getElementById('date-to').value   = toISO(to);
+  }
+  if (!isCustom) load();
+}
+
+function onCustomDate() {
+  const f = document.getElementById('date-from').value;
+  const t = document.getElementById('date-to').value;
+  if (f && t) load();
+}
+
+function setWindow(mins) {
+  currentMinutes = mins;
+  document.querySelectorAll('.window-tab').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.mins) === mins);
+  });
+  const label = mins >= 60 ? `${mins/60} hour` : `${mins} min`;
+  document.getElementById('card-title').textContent = `Busiest ${label} windows`;
+  load();
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+function fmtDate(s) {
+  const d = new Date(s);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function fmtTime(s) {
+  return s.slice(11, 16); // HH:MM from 'YYYY-MM-DD HH:MM:SS'
+}
+
+function fmtDow(s) {
+  return new Date(s).toLocaleDateString('en-GB', { weekday: 'long' });
+}
+
+function windowEndLabel(start, mins) {
+  const d = new Date(start);
+  d.setMinutes(d.getMinutes() + mins);
+  return d.toTimeString().slice(0, 5);
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function renderSummary(data) {
+  if (!data.length) { document.getElementById('summary-strip').innerHTML = ''; return; }
+
+  const top     = data[0];
+  const topDate = fmtDate(top.window_start);
+  const topTime = fmtTime(top.window_start);
+
+  // Average of top 10
+  const top10avg = Math.round(data.slice(0, 10).reduce((a, b) => a + b.count, 0) / Math.min(10, data.length));
+
+  // Most common day of week in top results
+  const dowCount = {};
+  data.slice(0, 20).forEach(r => {
+    const dow = new Date(r.window_start).toLocaleDateString('en-GB', { weekday: 'long' });
+    dowCount[dow] = (dowCount[dow] || 0) + 1;
+  });
+  const peakDow = Object.entries(dowCount).sort((a,b) => b[1]-a[1])[0]?.[0] || '—';
+
+  document.getElementById('summary-strip').innerHTML = `
+    <div class="sum-chip"><strong>${top.count}</strong>vehicles in #1 window</div>
+    <div class="sum-chip"><strong>${topDate}</strong>${topTime} – ${windowEndLabel(top.window_start, currentMinutes)}</div>
+    <div class="sum-chip"><strong>${top10avg}</strong>avg vehicles, top 10 windows</div>
+    <div class="sum-chip"><strong>${peakDow}</strong>most common busy day</div>
+  `;
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('table-wrap').innerHTML =
+      '<div class="state-box">No data found for this period.</div>';
+    document.getElementById('result-count').textContent = '';
+    return;
+  }
+
+  const maxCount = data[0].count;
+  document.getElementById('result-count').textContent = `${data.length} results`;
+
+  const rows = data.map(r => {
+    const rankClass = r.rank === 1 ? 'gold' : r.rank === 2 ? 'silver' : r.rank === 3 ? 'bronze' : '';
+    const barPct    = Math.round((r.count / maxCount) * 100);
+    const endTime   = windowEndLabel(r.window_start, currentMinutes);
+
+    return `<tr>
+      <td><span class="rank ${rankClass}">${r.rank}</span></td>
+      <td>
+        <div class="dt-cell">
+          <span class="dt-date">${fmtDate(r.window_start)}</span>
+          <span class="dt-time">${fmtTime(r.window_start)} – ${endTime}</span>
+        </div>
+      </td>
+      <td><span class="day-badge">${fmtDow(r.window_start)}</span></td>
+      <td>
+        <div class="count-cell">
+          <div class="count-bar-wrap"><div class="count-bar" style="width:${barPct}%"></div></div>
+          <span class="count-num">${r.count}</span>
+        </div>
+      </td>
+      <td>
+        <button class="rec-toggle" onclick="toggleRecs(this)">
+          ${r.recordings.length} recording${r.recordings.length !== 1 ? 's' : ''} ▾
+        </button>
+        <div class="rec-list" style="display:none">
+          ${r.recordings.map(rec => `
+            <div class="rec-item">
+              <span class="rec-name">${rec.basename}</span>
+              <a class="rec-link" href="${WEB_UI}" target="_blank"
+                 title="Open web UI — then select: ${rec.filename}">
+                Open web UI ↗
+              </a>
+              <a class="rec-link rec-dl" href="/api/download?path=${encodeURIComponent(rec.filename)}"
+                 download="${rec.basename}" title="Download raw recording">
+                ⬇ Download
+              </a>
+            </div>
+          `).join('')}
+          <div class="rec-note">Copy filename to locate in web UI</div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('table-wrap').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date &amp; Time</th>
+          <th>Day</th>
+          <th>Vehicles</th>
+          <th>Recordings</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ── Toggle recordings list ───────────────────────────────────────────────────
+function toggleRecs(btn) {
+  const list = btn.nextElementSibling;
+  const open = list.style.display === 'none';
+  list.style.display = open ? 'flex' : 'none';
+  btn.classList.toggle('open', open);
+  btn.textContent = btn.textContent.replace(open ? '▾' : '▴', open ? '▴' : '▾');
+}
+
+// ── Load ─────────────────────────────────────────────────────────────────────
+async function load() {
+  document.getElementById('table-wrap').innerHTML =
+    '<div class="state-box"><div class="spinner"></div><br>Loading…</div>';
+  document.getElementById('summary-strip').innerHTML = '';
+  document.getElementById('result-count').textContent = '';
+
+  const { from, to } = getDateRange();
+  if (!from || !to) return;
+
+  try {
+    const url = `/api/busiest_periods?from=${from}&to=${to}&minutes=${currentMinutes}&limit=50`;
+    const r   = await fetch(url);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const data = await r.json();
+    renderSummary(data);
+    renderTable(data);
+  } catch(e) {
+    document.getElementById('table-wrap').innerHTML =
+      `<div class="state-box">⚠️ Failed to load: ${e.message}</div>`;
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+load();
+</script>
+</body>
+</html>

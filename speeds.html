@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top Speeds — Traffic Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #f5f2ee;
+    --surface: #fffefb;
+    --border:  #e8e2d9;
+    --text:    #1a1714;
+    --muted:   #8a8076;
+    --accent1: #e8541a;
+    --accent2: #2d6a9f;
+    --accent3: #2a9d5c;
+    --accent4: #f0a500;
+    --accent5: #9b3fbf;
+    --red:     #c0392b;
+    --shadow:  0 2px 12px rgba(0,0,0,0.07);
+    --radius:  14px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .header-left a { color: var(--muted); text-decoration: none; font-size: 0.8rem; }
+  .header-left a:hover { color: var(--text); }
+  .header-title { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .controls label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+
+  .controls input[type="date"] {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .btn-group { display: flex; gap: 0.25rem; }
+
+  .btn-group button {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    padding: 0.28rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-group button:hover, .btn-group button.active {
+    background: var(--text);
+    color: #fff;
+    border-color: var(--text);
+  }
+
+  .divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+  /* ── Main ── */
+  main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* ── Summary strip ── */
+  .summary-strip { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+  .sum-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    box-shadow: var(--shadow);
+  }
+
+  .sum-chip strong {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    color: var(--text);
+    display: block;
+    line-height: 1.1;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 1.2rem 1.6rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .card-title { font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 600; }
+  .card-subtitle { font-size: 0.75rem; color: var(--muted); }
+
+  /* ── Filter row ── */
+  .filter-row {
+    padding: 0.75rem 1.6rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    background: var(--bg);
+  }
+
+  .filter-row label { font-size: 0.75rem; color: var(--muted); }
+
+  .filter-row select, .filter-row input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.25rem 0.5rem;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; }
+
+  thead th {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  thead th:hover { color: var(--text); }
+  thead th.sort-asc::after  { content: ' ↑'; }
+  thead th.sort-desc::after { content: ' ↓'; }
+
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: #f9f7f4; }
+  tbody tr.deleted { opacity: 0.35; pointer-events: none; }
+  tbody tr + tr td { border-top: 1px solid var(--border); }
+
+  tbody td {
+    padding: 0.7rem 1rem;
+    font-size: 0.82rem;
+    vertical-align: middle;
+  }
+
+  /* ── Rank ── */
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .rank.gold   { background: #fff8e6; border-color: #f0a500; color: #b87a00; }
+  .rank.silver { background: #f2f4f7; border-color: #aab0bb; color: #5a6070; }
+  .rank.bronze { background: #fdf3ee; border-color: #c8845a; color: #7a4020; }
+
+  /* ── Speed cell ── */
+  .speed-cell { display: flex; align-items: center; gap: 0.6rem; }
+
+  .speed-bar-wrap {
+    width: 80px; height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .speed-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+
+  .speed-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    min-width: 4.5rem;
+  }
+
+  /* ── Speed colour thresholds ── */
+  .spd-low    { color: var(--accent3); }
+  .spd-medium { color: var(--accent4); }
+  .spd-high   { color: var(--accent1); }
+  .spd-extreme{ color: var(--red); font-weight: 700; }
+
+  /* ── Badges ── */
+  .badge {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .badge-night { background: #1a1a2e; color: #a0a8d0; }
+  .badge-day   { background: #fff8e6; color: #b87a00; }
+  .badge-class {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* ── Direction ── */
+  .dir { font-size: 0.78rem; color: var(--muted); }
+
+  /* ── Recording expand ── */
+  .rec-toggle {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    color: var(--accent2);
+    background: #f0f6fd;
+    border: 1px solid #d0e0f0;
+    border-radius: 6px;
+    padding: 0.18rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .rec-toggle:hover, .rec-toggle.open {
+    background: var(--accent2); color: #fff; border-color: var(--accent2);
+  }
+
+  .rec-list {
+    margin-top: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .rec-item { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+
+  .rec-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .rec-link {
+    font-size: 0.7rem;
+    color: var(--accent2);
+    text-decoration: none;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid #d0e0f0;
+    border-radius: 5px;
+    background: #f0f6fd;
+    white-space: nowrap;
+    transition: all 0.12s;
+  }
+  .rec-link:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  .rec-dl { color: var(--accent3); background: #f0faf4; border-color: #c0e8d0; }
+  .rec-dl:hover { background: var(--accent3); color: #fff; border-color: var(--accent3); }
+
+  /* ── Delete button ── */
+  .btn-delete {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #e8c0bc;
+    border-radius: 6px;
+    background: #fdf0ef;
+    color: var(--red);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-delete:hover {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+  }
+
+  /* ── Confirm dialog ── */
+  .confirm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .confirm-overlay.show { display: flex; }
+
+  .confirm-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+  }
+
+  .confirm-box h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .confirm-box p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+
+  .confirm-btns { display: flex; gap: 0.75rem; justify-content: center; }
+
+  .confirm-btns button {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 0.5rem 1.4rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-cancel { background: var(--bg); color: var(--muted); }
+  .btn-cancel:hover { background: var(--border); }
+  .btn-confirm-del { background: var(--red); color: #fff; border-color: var(--red); }
+  .btn-confirm-del:hover { opacity: 0.85; }
+
+  /* ── Loading ── */
+  .state-box { padding: 3.5rem 2rem; text-align: center; color: var(--muted); font-size: 0.88rem; }
+  .spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 2px solid var(--border); border-top-color: var(--accent2);
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 0.75rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    header { flex-direction: column; height: auto; padding: 0.75rem 1rem; gap: 0.5rem; }
+    .controls { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Confirm delete dialog -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Delete this record?</h3>
+    <p id="confirm-msg">This will permanently remove the vehicle entry from the database. The recording file itself is not affected.</p>
+    <div class="confirm-btns">
+      <button class="btn-cancel" onclick="cancelDelete()">Cancel</button>
+      <button class="btn-confirm-del" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="header-left">
+    <a href="/">← Dashboard</a>
+    <span class="header-title">Top Speeds</span>
+  </div>
+  <div class="controls">
+    <div class="btn-group" id="range-btns">
+      <button onclick="setRange('alltime')" id="btn-alltime">All time</button>
+      <button onclick="setRange('week')"    id="btn-week">Last week</button>
+      <button onclick="setRange('month')"   id="btn-month" class="active">Last month</button>
+      <button onclick="setRange('custom')"  id="btn-custom">Custom</button>
+    </div>
+    <div class="divider" id="date-divider" style="display:none"></div>
+    <label id="lbl-from" style="display:none">From</label>
+    <input type="date" id="date-from" style="display:none" onchange="onCustomDate()">
+    <label id="lbl-to" style="display:none">To</label>
+    <input type="date" id="date-to"   style="display:none" onchange="onCustomDate()">
+  </div>
+</header>
+
+<main>
+  <div class="summary-strip" id="summary-strip"></div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Highest recorded speeds</div>
+        <div class="card-subtitle">Ranked by speed — click a row's bin icon to remove erroneous entries</div>
+      </div>
+      <div class="card-subtitle" id="result-count"></div>
+    </div>
+
+    <div class="filter-row">
+      <label>Min speed</label>
+      <input type="number" id="filter-min" value="0" min="0" max="999" style="width:5rem" onchange="applyFilters()">
+      <label>km/h &nbsp; Class</label>
+      <select id="filter-class" onchange="applyFilters()">
+        <option value="">All classes</option>
+        <option value="car">Car</option>
+        <option value="truck">Truck</option>
+        <option value="bus">Bus</option>
+        <option value="motorbike">Motorbike</option>
+      </select>
+      <label>Direction</label>
+      <select id="filter-dir" onchange="applyFilters()">
+        <option value="">All</option>
+        <option value="left">← Left</option>
+        <option value="right">→ Right</option>
+      </select>
+    </div>
+
+    <div id="table-wrap">
+      <div class="state-box"><div class="spinner"></div><br>Loading…</div>
+    </div>
+  </div>
+</main>
+
+<script>
+const WEB_UI = `http://${window.location.hostname}:5002`;
+let allData  = [];
+let pendingDeleteId   = null;
+let pendingDeleteRow  = null;
+
+// ── Date helpers ─────────────────────────────────────────────────────────────
+const toISO = d => d.toISOString().slice(0, 10);
+
+function getDateRange() {
+  if (currentRange === 'custom') {
+    return { from: document.getElementById('date-from').value,
+             to:   document.getElementById('date-to').value };
+  }
+  const to = new Date(), from = new Date();
+  if (currentRange === 'week')    from.setDate(from.getDate() - 7);
+  if (currentRange === 'month')   from.setDate(from.getDate() - 30);
+  if (currentRange === 'alltime') from.setFullYear(2000);
+  return { from: toISO(from), to: toISO(to) };
+}
+
+let currentRange = 'month';
+
+function setRange(r) {
+  currentRange = r;
+  document.querySelectorAll('#range-btns button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-${r}`).classList.add('active');
+  const isCustom = r === 'custom';
+  ['date-divider','lbl-from','date-from','lbl-to','date-to']
+    .forEach(id => document.getElementById(id).style.display = isCustom ? '' : 'none');
+  if (isCustom) {
+    const to = new Date(), from = new Date();
+    from.setDate(from.getDate() - 30);
+    document.getElementById('date-from').value = toISO(from);
+    document.getElementById('date-to').value   = toISO(to);
+  }
+  if (!isCustom) load();
+}
+
+function onCustomDate() {
+  if (document.getElementById('date-from').value &&
+      document.getElementById('date-to').value) load();
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+function fmtDateTime(s) {
+  const d = new Date(s);
+  return `${d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', year:'numeric'})}
+          <span style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted)">
+            ${d.toTimeString().slice(0,5)}
+          </span>`;
+}
+
+function speedClass(kmh) {
+  if (kmh > 150) return 'spd-extreme';
+  if (kmh > 80)  return 'spd-high';
+  if (kmh > 50)  return 'spd-medium';
+  return 'spd-low';
+}
+
+function speedBarColor(kmh) {
+  if (kmh > 150) return 'var(--red)';
+  if (kmh > 80)  return 'var(--accent1)';
+  if (kmh > 50)  return 'var(--accent4)';
+  return 'var(--accent3)';
+}
+
+function dirLabel(d) {
+  return d === 'left' ? '← Left' : d === 'right' ? '→ Right' :
+         d === 'toward' ? '↓ Toward' : d === 'away' ? '↑ Away' : d || '—';
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+function renderSummary(data) {
+  if (!data.length) { document.getElementById('summary-strip').innerHTML = ''; return; }
+  const top    = data[0];
+  const avg    = (data.reduce((a,b) => a + b.speed_kmh, 0) / data.length).toFixed(1);
+  const over100 = data.filter(d => d.speed_kmh > 100).length;
+  const over150 = data.filter(d => d.speed_kmh > 150).length;
+
+  document.getElementById('summary-strip').innerHTML = `
+    <div class="sum-chip"><strong>${top.speed_kmh.toFixed(1)} km/h</strong>fastest recorded</div>
+    <div class="sum-chip"><strong>${avg} km/h</strong>avg of top ${data.length}</div>
+    <div class="sum-chip"><strong>${over100}</strong>entries over 100 km/h</div>
+    <div class="sum-chip"><strong>${over150}</strong>entries over 150 km/h — likely errors</div>
+  `;
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const minSpd  = parseFloat(document.getElementById('filter-min').value) || 0;
+  const cls     = document.getElementById('filter-class').value;
+  const dir     = document.getElementById('filter-dir').value;
+
+  const filtered = allData.filter(r =>
+    r.speed_kmh >= minSpd &&
+    (!cls || r.vehicle_class === cls) &&
+    (!dir || r.direction === dir)
+  );
+  renderTable(filtered);
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('table-wrap').innerHTML =
+      '<div class="state-box">No records match the current filters.</div>';
+    document.getElementById('result-count').textContent = '';
+    return;
+  }
+
+  const maxSpeed = data[0].speed_kmh;
+  document.getElementById('result-count').textContent = `${data.length} records`;
+
+  const rows = data.map((r, i) => {
+    const rank      = i + 1;
+    const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const barPct    = Math.round((r.speed_kmh / maxSpeed) * 100);
+    const spdCls    = speedClass(r.speed_kmh);
+    const barColor  = speedBarColor(r.speed_kmh);
+    const basename  = r.filename.split('/').pop();
+    const dlUrl     = `/api/download?path=${encodeURIComponent(r.filename)}`;
+
+    return `<tr id="row-${r.vehicle_id}">
+      <td><span class="rank ${rankClass}">${rank}</span></td>
+      <td>${fmtDateTime(r.recorded_at)}</td>
+      <td>
+        <div class="speed-cell">
+          <div class="speed-bar-wrap">
+            <div class="speed-bar" style="width:${barPct}%;background:${barColor}"></div>
+          </div>
+          <span class="speed-num ${spdCls}">${r.speed_kmh.toFixed(1)} km/h</span>
+        </div>
+      </td>
+      <td><span class="badge badge-class">${r.vehicle_class || '—'}</span></td>
+      <td><span class="dir">${dirLabel(r.direction)}</span></td>
+      <td>${r.zone || '—'}</td>
+      <td><span class="badge ${r.is_night ? 'badge-night' : 'badge-day'}">${r.is_night ? '🌙 Night' : '☀️ Day'}</span></td>
+      <td>
+        <button class="rec-toggle" onclick="toggleRecs(this)">
+          Recording ▾
+        </button>
+        <div class="rec-list" style="display:none">
+          <div class="rec-item">
+            <span class="rec-name">${basename}</span>
+            <a class="rec-link" href="${WEB_UI}" target="_blank">Open web UI ↗</a>
+            <a class="rec-link rec-dl" href="${dlUrl}" download="${basename}">⬇ Download</a>
+          </div>
+        </div>
+      </td>
+      <td>
+        <button class="btn-delete" onclick="promptDelete(${r.vehicle_id}, '${r.speed_kmh.toFixed(1)} km/h ${r.vehicle_class || ''} on ${r.recorded_at.slice(0,10)}', this)">
+          🗑 Delete
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('table-wrap').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date / Time</th>
+          <th>Speed</th>
+          <th>Class</th>
+          <th>Direction</th>
+          <th>Zone</th>
+          <th>Mode</th>
+          <th>Recording</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ── Recording toggle ──────────────────────────────────────────────────────────
+function toggleRecs(btn) {
+  const list = btn.nextElementSibling;
+  const open = list.style.display === 'none';
+  list.style.display = open ? 'flex' : 'none';
+  btn.classList.toggle('open', open);
+  btn.textContent = btn.textContent.replace(open ? '▾':'▴', open ? '▴':'▾');
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function promptDelete(id, description, btn) {
+  pendingDeleteId  = id;
+  pendingDeleteRow = document.getElementById(`row-${id}`);
+  document.getElementById('confirm-msg').textContent =
+    `This will permanently remove: ${description}. The recording file is not affected.`;
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+function cancelDelete() {
+  pendingDeleteId  = null;
+  pendingDeleteRow = null;
+  document.getElementById('confirm-overlay').classList.remove('show');
+}
+
+async function confirmDelete() {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  if (!pendingDeleteId) return;
+
+  try {
+    const r = await fetch(`/api/vehicles/${pendingDeleteId}`, { method: 'DELETE' });
+    const data = await r.json();
+    if (data.ok) {
+      // Fade the row out
+      if (pendingDeleteRow) {
+        pendingDeleteRow.classList.add('deleted');
+        setTimeout(() => pendingDeleteRow.remove(), 600);
+      }
+      // Remove from allData so filters work correctly
+      allData = allData.filter(v => v.vehicle_id !== pendingDeleteId);
+      // Update summary
+      renderSummary(allData);
+      document.getElementById('result-count').textContent =
+        `${document.querySelectorAll('tbody tr:not(.deleted)').length} records`;
+    } else {
+      alert(`Delete failed: ${data.error}`);
+    }
+  } catch(e) {
+    alert(`Error: ${e.message}`);
+  }
+
+  pendingDeleteId  = null;
+  pendingDeleteRow = null;
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load() {
+  document.getElementById('table-wrap').innerHTML =
+    '<div class="state-box"><div class="spinner"></div><br>Loading…</div>';
+  document.getElementById('summary-strip').innerHTML = '';
+  document.getElementById('result-count').textContent = '';
+
+  const { from, to } = getDateRange();
+  if (!from || !to) return;
+
+  try {
+    const r = await fetch(`/api/top_speeds?from=${from}&to=${to}&limit=100`);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    allData = await r.json();
+    renderSummary(allData);
+    applyFilters();
+  } catch(e) {
+    document.getElementById('table-wrap').innerHTML =
+      `<div class="state-box">⚠️ Failed to load: ${e.message}</div>`;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+load();
+</script>
+</body>
+</html>

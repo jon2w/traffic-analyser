@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #f5f2ee;
+    --surface:   #fffefb;
+    --border:    #e8e2d9;
+    --text:      #1a1714;
+    --muted:     #8a8076;
+    --accent1:   #e8541a;   /* orange-red */
+    --accent2:   #2d6a9f;   /* deep blue */
+    --accent3:   #2a9d5c;   /* green */
+    --accent4:   #f0a500;   /* amber */
+    --accent5:   #9b3fbf;   /* purple */
+    --shadow:    0 2px 12px rgba(0,0,0,0.07);
+    --radius:    14px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--text);
+    color: #fff;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: var(--accent1);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* ── Date controls ── */
+  .controls {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .date-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .date-inputs input[type=date] {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .date-inputs input[type=date]:focus {
+    border-color: var(--accent2);
+  }
+
+  .shortcuts {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .shortcut {
+    padding: 0.35rem 0.8rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .shortcut:hover, .shortcut.active {
+    background: var(--text);
+    color: #fff;
+    border-color: var(--text);
+  }
+
+  .refresh-btn {
+    margin-left: auto;
+    padding: 0.4rem 1rem;
+    background: var(--accent1);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .refresh-btn:hover { opacity: 0.85; }
+
+  /* ── Nav tabs ── */
+  .nav {
+    padding: 0 2rem;
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .nav-tab {
+    padding: 0.85rem 1.3rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active {
+    color: var(--accent1);
+    border-bottom-color: var(--accent1);
+  }
+
+  /* ── Main content ── */
+  main {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ── Cards ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.4rem 1.6rem;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .stat-card.c1::before { background: var(--accent1); }
+  .stat-card.c2::before { background: var(--accent2); }
+  .stat-card.c3::before { background: var(--accent3); }
+  .stat-card.c4::before { background: var(--accent4); }
+  .stat-card.c5::before { background: var(--accent5); }
+
+  .stat-label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 2.4rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .stat-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  /* ── Chart cards ── */
+  .chart-grid {
+    display: grid;
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .chart-grid.two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-grid.three-col {
+    grid-template-columns: 2fr 1fr;
+  }
+
+  @media (max-width: 900px) {
+    .chart-grid.two-col,
+    .chart-grid.three-col { grid-template-columns: 1fr; }
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.4rem 1.6rem;
+    box-shadow: var(--shadow);
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .chart-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .chart-subtitle {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 1.2rem;
+  }
+
+  .chart-wrap {
+    position: relative;
+  }
+
+  canvas { max-width: 100%; }
+
+  /* ── Table ── */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .table-header {
+    padding: 1.2rem 1.6rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+  }
+
+  .table-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .table-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .filter-select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.35rem 0.7rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .filter-select:focus { border-color: var(--accent2); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+  }
+
+  th {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td { background: var(--bg); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .badge-left  { background: #dbeafe; color: #1d4ed8; }
+  .badge-right { background: #fce7d8; color: #c2410c; }
+  .badge-night { background: #ede9fe; color: #6d28d9; }
+  .badge-day   { background: #fef9c3; color: #854d0e; }
+
+  .dir-arrow { font-size: 1em; }
+
+  /* ── Pagination ── */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.6rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .pagination-btns { display: flex; gap: 0.4rem; }
+
+  .page-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .page-btn:hover { background: var(--bg); }
+  .page-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── Loading ── */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent1);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Empty state ── */
+  .empty {
+    padding: 3rem;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+  /* ── Week comparison specific ── */
+  .week-legend {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    font-size: 0.78rem;
+  }
+
+  .week-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .week-swatch {
+    width: 24px; height: 4px;
+    border-radius: 2px;
+  }
+
+  /* ── Section heading ── */
+  .section-heading {
+    font-family: 'Fraunces', serif;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 1.2rem;
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Traffic Monitor
+  </div>
+  <div class="header-right">
+    <span id="last-updated">—</span>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="date-inputs">
+    <span>From</span>
+    <input type="date" id="date-from">
+    <span>to</span>
+    <input type="date" id="date-to">
+  </div>
+  <div class="shortcuts">
+    <button class="shortcut" data-days="7">7 days</button>
+    <button class="shortcut active" data-days="14">2 weeks</button>
+    <button class="shortcut" data-days="30">Month</button>
+    <button class="shortcut" data-days="90">3 months</button>
+  </div>
+  <button class="refresh-btn" id="refresh-btn">↻ Refresh</button>
+</div>
+
+<div class="nav">
+  <div class="nav-tab active" data-view="overview">Overview</div>
+  <div class="nav-tab" data-view="daily">Daily</div>
+  <div class="nav-tab" data-view="weekly">Week Comparison</div>
+  <div class="nav-tab" data-view="patterns">Patterns</div>
+  <div class="nav-tab" data-view="records">Records</div>
+  <div class="nav-tab" data-view="busiest" onclick="window.location.href='/busiest'" style="cursor:pointer">Busiest Periods ↗</div>
+  <div class="nav-tab" data-view="speeds" onclick="window.location.href='/speeds'" style="cursor:pointer">Top Speeds ↗</div>
+</div>
+
+<main>
+
+  <!-- ── Overview ── -->
+  <div class="view active" id="view-overview">
+    <div class="stat-grid" id="summary-cards">
+      <div class="loading"><div class="spinner"></div> Loading…</div>
+    </div>
+    <div class="chart-grid three-col">
+      <div class="chart-card">
+        <div class="chart-title">Vehicles per Day</div>
+        <div class="chart-subtitle">Total detections for selected period</div>
+        <div class="chart-wrap"><canvas id="chart-daily-bar" height="220"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Direction Split</div>
+        <div class="chart-subtitle">Left vs right for period</div>
+        <div class="chart-wrap"><canvas id="chart-direction-donut" height="220"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid two-col">
+      <div class="chart-card">
+        <div class="chart-title">Traffic by Hour</div>
+        <div class="chart-subtitle">Average across selected days</div>
+        <div class="chart-wrap"><canvas id="chart-hourly" height="200"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem">
+          <div class="chart-title">Speed Distribution</div>
+          <a href="/speeds" style="font-size:0.75rem;color:var(--muted);text-decoration:none;white-space:nowrap" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Top speeds ↗</a>
+        </div>
+        <div class="chart-subtitle">Vehicle counts by speed band (km/h)</div>
+        <div class="chart-wrap" style="cursor:pointer" onclick="window.location.href='/speeds'" title="View top speeds">
+          <canvas id="chart-speed-dist" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:1.2rem">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem">
+        <div class="chart-title">Hourly Profile by Day of Week</div>
+        <a href="/dow" style="font-size:0.75rem;color:var(--muted);text-decoration:none;white-space:nowrap" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">View full page ↗</a>
+      </div>
+      <div class="chart-subtitle">Vehicles per hour — each line is a day of the week</div>
+      <div class="chart-wrap">
+        <canvas id="chart-hourly-dow" height="180" style="cursor:pointer" onclick="window.location.href='/dow'" title="Open full page view"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Daily ── -->
+  <div class="view" id="view-daily">
+    <div class="chart-card" style="margin-bottom:1.2rem">
+      <div class="chart-title">Daily Traffic Volume</div>
+      <div class="chart-subtitle">Vehicles per day with direction breakdown</div>
+      <div class="chart-wrap"><canvas id="chart-daily-stacked" height="180"></canvas></div>
+    </div>
+    <div class="chart-grid two-col">
+      <div class="chart-card">
+        <div class="chart-title">Average Speed by Day</div>
+        <div class="chart-subtitle">Mean vehicle speed (km/h)</div>
+        <div class="chart-wrap"><canvas id="chart-daily-speed" height="200"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Day / Night Split</div>
+        <div class="chart-subtitle">Vehicles recorded in daylight vs night</div>
+        <div class="chart-wrap"><canvas id="chart-day-night" height="200"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:1.2rem">
+      <div class="chart-title">Traffic by Hour</div>
+      <div class="chart-subtitle">Average vehicles per hour across selected period</div>
+      <div class="chart-wrap"><canvas id="chart-daily-hourly" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Weekly ── -->
+  <div class="view" id="view-weekly">
+    <div class="chart-card" style="margin-bottom:1.2rem">
+      <div class="chart-title">Week-by-Week Comparison</div>
+      <div class="chart-subtitle">Total vehicles per week</div>
+      <div class="chart-wrap"><canvas id="chart-weeks-bar" height="200"></canvas></div>
+    </div>
+    <div class="chart-grid two-col">
+      <div class="chart-card">
+        <div class="chart-title">Weekly Speed Trend</div>
+        <div class="chart-subtitle">Average speed per week (km/h)</div>
+        <div class="chart-wrap"><canvas id="chart-weeks-speed" height="200"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Weekly Direction Comparison</div>
+        <div class="chart-subtitle">Left vs right per week</div>
+        <div class="chart-wrap"><canvas id="chart-weeks-direction" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Patterns ── -->
+  <div class="view" id="view-patterns">
+    <div class="chart-grid two-col">
+      <div class="chart-card">
+        <div class="chart-title">Traffic by Day of Week</div>
+        <div class="chart-subtitle">Average vehicles per day type</div>
+        <div class="chart-wrap"><canvas id="chart-weekday" height="220"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Speed by Day of Week</div>
+        <div class="chart-subtitle">Average speed (km/h) per day type</div>
+        <div class="chart-wrap"><canvas id="chart-weekday-speed" height="220"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">24-Hour Traffic Profile</div>
+      <div class="chart-subtitle">Average vehicles per hour across selected period</div>
+      <div class="chart-wrap"><canvas id="chart-hourly-full" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Records ── -->
+  <div class="view" id="view-records">
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Vehicle Records</div>
+        <div class="table-filters">
+          <select class="filter-select" id="filter-zone">
+            <option value="">All zones</option>
+          </select>
+          <select class="filter-select" id="filter-direction">
+            <option value="">All directions</option>
+            <option value="left">← Left</option>
+            <option value="right">→ Right</option>
+            <option value="toward">↓ Toward</option>
+            <option value="away">↑ Away</option>
+          </select>
+        </div>
+      </div>
+      <div id="table-body">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+      <div class="pagination" id="pagination" style="display:none">
+        <span id="pagination-info"></span>
+        <div class="pagination-btns" id="pagination-btns"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const state = {
+  from: null, to: null,
+  view: 'overview',
+  page: 1,
+  filterZone: '',
+  filterDirection: '',
+  charts: {}
+};
+
+// ── Date utils ────────────────────────────────────────────────────────────────
+function fmt(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function setDates(days) {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (days - 1));
+  state.from = fmt(from);
+  state.to   = fmt(to);
+  document.getElementById('date-from').value = state.from;
+  document.getElementById('date-to').value   = state.to;
+}
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+async function api(endpoint, extra = '') {
+  const url = `${endpoint}?from=${state.from}&to=${state.to}${extra}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+// ── Colour palette ────────────────────────────────────────────────────────────
+const COLORS = [
+  '#e8541a', '#2d6a9f', '#2a9d5c', '#f0a500', '#9b3fbf',
+  '#e8541a99', '#2d6a9f99', '#2a9d5c99', '#f0a50099'
+];
+
+const weekColors = [
+  '#e8541a','#2d6a9f','#2a9d5c','#f0a500','#9b3fbf','#e05c9e','#3db8d4'
+];
+
+function weekLabel(row) {
+  const d = new Date(row.week_start);
+  return `w/c ${d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}`;
+}
+
+// ── Chart helpers ─────────────────────────────────────────────────────────────
+function destroyChart(id) {
+  if (state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; }
+}
+
+function makeChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  state.charts[id] = new Chart(ctx, config);
+}
+
+const baseFont = { family: "'DM Sans', sans-serif", size: 11 };
+const gridColor = '#e8e2d9';
+
+function baseScales(xLabel='', yLabel='') {
+  return {
+    x: {
+      grid: { color: gridColor, drawBorder: false },
+      ticks: { font: baseFont, color: '#8a8076', maxRotation: 45 },
+      title: xLabel ? { display: true, text: xLabel, font: baseFont } : {}
+    },
+    y: {
+      grid: { color: gridColor, drawBorder: false },
+      ticks: { font: baseFont, color: '#8a8076' },
+      beginAtZero: true,
+      title: yLabel ? { display: true, text: yLabel, font: baseFont } : {}
+    }
+  };
+}
+
+// ── Load all data for current view ───────────────────────────────────────────
+async function loadAll() {
+  document.getElementById('last-updated').textContent = 'Loading…';
+  try {
+    if (state.view === 'overview')  await loadOverview();
+    if (state.view === 'daily')     await loadDaily();
+    if (state.view === 'weekly')    await loadWeekly();
+    if (state.view === 'patterns')  await loadPatterns();
+    if (state.view === 'records')   await loadRecords();
+    document.getElementById('last-updated').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('last-updated').textContent = 'Error loading data';
+  }
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  const [summary, daily, hourly, speed, dowHourly] = await Promise.all([
+    api('/api/summary'),
+    api('/api/daily'),
+    api('/api/hourly'),
+    api('/api/speed_distribution'),
+    api('/api/hourly_by_dow')
+  ]);
+
+  // Summary cards
+  const cards = document.getElementById('summary-cards');
+  cards.innerHTML = `
+    <div class="stat-card c1">
+      <div class="stat-label">Total Vehicles</div>
+      <div class="stat-value">${(summary.total_vehicles||0).toLocaleString()}</div>
+      <div class="stat-sub">over ${summary.days_with_data||0} days</div>
+    </div>
+    <div class="stat-card c2">
+      <div class="stat-label">Avg Speed</div>
+      <div class="stat-value">${summary.avg_speed || '—'}</div>
+      <div class="stat-sub">km/h</div>
+    </div>
+    <div class="stat-card c3">
+      <div class="stat-label">Max Speed</div>
+      <div class="stat-value">${summary.max_speed || '—'}</div>
+      <div class="stat-sub">km/h recorded</div>
+    </div>
+    <div class="stat-card c4">
+      <div class="stat-label">→ Right</div>
+      <div class="stat-value">${(summary.going_right||0).toLocaleString()}</div>
+      <div class="stat-sub">${pct(summary.going_right, summary.total_vehicles)}% of total</div>
+    </div>
+    <div class="stat-card c5">
+      <div class="stat-label">← Left</div>
+      <div class="stat-value">${(summary.going_left||0).toLocaleString()}</div>
+      <div class="stat-sub">${pct(summary.going_left, summary.total_vehicles)}% of total</div>
+    </div>
+  `;
+
+  // Daily bar — gap days shown in amber with hatching via per-bar colour
+  makeChart('chart-daily-bar', {
+    type: 'bar',
+    data: {
+      labels: daily.map(d => fmtDate(d.date)),
+      datasets: [{
+        data: daily.map(d => d.total),
+        backgroundColor: daily.map(d => d.has_gap ? '#f0a50099' : COLORS[0] + 'cc'),
+        borderColor:     daily.map(d => d.has_gap ? '#f0a500'   : COLORS[0]),
+        borderWidth: daily.map(d => d.has_gap ? 2 : 1),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => items[0].label.join ? items[0].label.join(' ') : items[0].label,
+            afterBody: items => {
+              const d = daily[items[0].dataIndex];
+              if (!d.has_gap) return [];
+              const hrs = d.missing_hours.map(h => `${String(h).padStart(2,'0')}:00`);
+              return [`⚠ Possible missing data`, `Low traffic: ${hrs.join(', ')}`];
+            }
+          }
+        }
+      },
+      scales: {
+        ...baseScales(),
+        x: {
+          ...baseScales().x,
+          ticks: {
+            font: baseFont,
+            color: ctx => {
+              const d = daily[ctx.index];
+              return d && d.has_gap ? '#f0a500' : '#8a8076';
+            },
+            maxRotation: 0,
+          }
+        }
+      },
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        const d = daily[idx];
+        // Switch to Daily view filtered to this single day
+        state.from = d.date;
+        state.to   = d.date;
+        document.getElementById('date-from').value = d.date;
+        document.getElementById('date-to').value   = d.date;
+        document.querySelectorAll('.shortcut').forEach(b => b.classList.remove('active'));
+        switchView('daily');
+      },
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+      }
+    }
+  });
+
+  // Direction donut
+  makeChart('chart-direction-donut', {
+    type: 'doughnut',
+    data: {
+      labels: ['→ Right', '← Left'],
+      datasets: [{
+        data: [summary.going_right||0, summary.going_left||0],
+        backgroundColor: [COLORS[0], COLORS[1]],
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: baseFont, padding: 16 } }
+      }
+    }
+  });
+
+  // Hourly
+  makeChart('chart-hourly', {
+    type: 'bar',
+    data: {
+      labels: hourly.map(h => `${String(h.hour).padStart(2,'0')}:00`),
+      datasets: [{
+        data: hourly.map(h => h.total),
+        backgroundColor: COLORS[1] + 'bb',
+        borderColor: COLORS[1],
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales()
+    }
+  });
+
+  // Speed distribution
+  makeChart('chart-speed-dist', {
+    type: 'bar',
+    data: {
+      labels: speed.map(s => `${s.bucket}–${s.bucket+9}`),
+      datasets: [{
+        data: speed.map(s => s.count),
+        backgroundColor: COLORS[2] + 'bb',
+        borderColor: COLORS[2],
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('km/h', 'Vehicles')
+    }
+  });
+
+  // Hourly by day of week
+  const dowColors = ['#e8541a','#2d6a9f','#2a9d5c','#f0a500','#9b3fbf','#e05c9e','#3db8d4'];
+  const hourLabels = Array.from({length:24}, (_, h) => `${String(h).padStart(2,'0')}:00`);
+  makeChart('chart-hourly-dow', {
+    type: 'line',
+    data: {
+      labels: hourLabels,
+      datasets: dowHourly.map((d, i) => ({
+        label: d.day_name,
+        data: d.hours,
+        borderColor: dowColors[i % dowColors.length],
+        backgroundColor: 'transparent',
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        tension: 0.4
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: baseFont, usePointStyle: true, pointStyleWidth: 16, padding: 16 }
+        }
+      },
+      scales: baseScales('Hour', 'Vehicles'),
+      interaction: { mode: 'index', intersect: false }
+    }
+  });
+}
+
+// ── Daily ─────────────────────────────────────────────────────────────────────
+async function loadDaily() {
+  const daily = await api('/api/daily');
+
+  // Stacked bar
+  makeChart('chart-daily-stacked', {
+    type: 'bar',
+    data: {
+      labels: daily.map(d => fmtDateStr(d.date)),
+      datasets: [
+        {
+          label: '→ Right',
+          data: daily.map(d => d.going_right),
+          backgroundColor: COLORS[0] + 'cc',
+          borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 }
+        },
+        {
+          label: '← Left',
+          data: daily.map(d => d.going_left),
+          backgroundColor: COLORS[1] + 'cc',
+          borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 }
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: baseFont } } },
+      scales: { ...baseScales(), x: { ...baseScales().x, stacked: true }, y: { ...baseScales().y, stacked: true } }
+    }
+  });
+
+  // Speed line
+  makeChart('chart-daily-speed', {
+    type: 'line',
+    data: {
+      labels: daily.map(d => fmtDateStr(d.date)),
+      datasets: [{
+        label: 'Avg Speed',
+        data: daily.map(d => d.avg_speed),
+        borderColor: COLORS[3],
+        backgroundColor: COLORS[3] + '22',
+        pointBackgroundColor: COLORS[3],
+        pointRadius: 4,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('', 'km/h')
+    }
+  });
+
+  // Day/Night stacked
+  makeChart('chart-day-night', {
+    type: 'bar',
+    data: {
+      labels: daily.map(d => fmtDateStr(d.date)),
+      datasets: [
+        {
+          label: 'Day',
+          data: daily.map(d => d.day_count),
+          backgroundColor: COLORS[3] + 'bb',
+        },
+        {
+          label: 'Night',
+          data: daily.map(d => d.night_count),
+          backgroundColor: COLORS[4] + 'bb',
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: baseFont } } },
+      scales: { ...baseScales(), x: { ...baseScales().x, stacked: true }, y: { ...baseScales().y, stacked: true } }
+    }
+  });
+
+  // Hourly chart
+  const hourly = await api('/api/hourly');
+  makeChart('chart-daily-hourly', {
+    type: 'bar',
+    data: {
+      labels: hourly.map(h => `${String(h.hour).padStart(2,'0')}:00`),
+      datasets: [{
+        data: hourly.map(h => h.total),
+        backgroundColor: COLORS[1] + 'bb',
+        borderColor: COLORS[1],
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('Hour', 'Vehicles')
+    }
+  });
+}
+
+// ── Weekly ────────────────────────────────────────────────────────────────────
+async function loadWeekly() {
+  const weeks = await api('/api/weeks');
+
+  const labels = weeks.map(weekLabel);
+  const colors = weeks.map((_, i) => weekColors[i % weekColors.length]);
+
+  makeChart('chart-weeks-bar', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Vehicles',
+        data: weeks.map(w => w.total),
+        backgroundColor: colors.map(c => c + 'bb'),
+        borderColor: colors,
+        borderWidth: 1,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales()
+    }
+  });
+
+  makeChart('chart-weeks-speed', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Avg Speed',
+        data: weeks.map(w => w.avg_speed),
+        borderColor: COLORS[0],
+        backgroundColor: COLORS[0] + '22',
+        pointBackgroundColor: colors,
+        pointRadius: 6,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('', 'km/h')
+    }
+  });
+
+  makeChart('chart-weeks-direction', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '→ Right',
+          data: weeks.map(w => w.going_right),
+          backgroundColor: COLORS[0] + 'cc',
+        },
+        {
+          label: '← Left',
+          data: weeks.map(w => w.going_left),
+          backgroundColor: COLORS[1] + 'cc',
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: baseFont } } },
+      scales: { ...baseScales(), x: { ...baseScales().x, stacked: true }, y: { ...baseScales().y, stacked: true } }
+    }
+  });
+}
+
+// ── Patterns ──────────────────────────────────────────────────────────────────
+async function loadPatterns() {
+  const [weekday, hourly] = await Promise.all([
+    api('/api/weekday'),
+    api('/api/hourly')
+  ]);
+
+  const dowNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  makeChart('chart-weekday', {
+    type: 'bar',
+    data: {
+      labels: weekday.map(d => d.day_name),
+      datasets: [{
+        data: weekday.map(d => d.num_days > 0 ? (d.total / d.num_days).toFixed(1) : 0),
+        backgroundColor: weekday.map((_, i) => weekColors[i % weekColors.length] + 'bb'),
+        borderColor:     weekday.map((_, i) => weekColors[i % weekColors.length]),
+        borderWidth: 1,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('', 'Avg vehicles/day')
+    }
+  });
+
+  makeChart('chart-weekday-speed', {
+    type: 'bar',
+    data: {
+      labels: weekday.map(d => d.day_name),
+      datasets: [{
+        data: weekday.map(d => d.avg_speed),
+        backgroundColor: weekday.map((_, i) => weekColors[i % weekColors.length] + '88'),
+        borderColor:     weekday.map((_, i) => weekColors[i % weekColors.length]),
+        borderWidth: 1,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('', 'km/h')
+    }
+  });
+
+  makeChart('chart-hourly-full', {
+    type: 'line',
+    data: {
+      labels: hourly.map(h => `${String(h.hour).padStart(2,'0')}:00`),
+      datasets: [{
+        data: hourly.map(h => h.total),
+        borderColor: COLORS[2],
+        backgroundColor: COLORS[2] + '22',
+        pointRadius: 3,
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: baseScales('Hour', 'Vehicles')
+    }
+  });
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+async function loadRecords() {
+  const tb = document.getElementById('table-body');
+  tb.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+
+  const extra = `&page=${state.page}&per_page=50` +
+    (state.filterZone      ? `&zone=${encodeURIComponent(state.filterZone)}` : '') +
+    (state.filterDirection ? `&direction=${encodeURIComponent(state.filterDirection)}` : '');
+
+  const data = await api('/api/vehicles', extra);
+
+  if (!data.vehicles.length) {
+    tb.innerHTML = '<div class="empty"><div class="empty-icon">🚗</div>No records found</div>';
+    document.getElementById('pagination').style.display = 'none';
+    return;
+  }
+
+  tb.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date / Time</th>
+          <th>Zone</th>
+          <th>Direction</th>
+          <th>Speed</th>
+          <th>Class</th>
+          <th>Frames</th>
+          <th>Duration</th>
+          <th>Mode</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.vehicles.map((v, i) => `
+          <tr>
+            <td style="color:var(--muted)">${v.id}</td>
+            <td>${fmtDateTime(v.recorded_at)}</td>
+            <td>${v.zone || '—'}</td>
+            <td>${dirBadge(v.direction)}</td>
+            <td>${v.speed_kmh != null ? v.speed_kmh.toFixed(1) + ' km/h' : '—'}</td>
+            <td>${v.vehicle_class || '—'}</td>
+            <td>${v.track_frames || '—'}</td>
+            <td>${v.duration_s != null ? v.duration_s.toFixed(1) + 's' : '—'}</td>
+            <td>${v.is_night ? '<span class="badge badge-night">🌙 Night</span>' : '<span class="badge badge-day">☀️ Day</span>'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // Pagination
+  const pg = document.getElementById('pagination');
+  pg.style.display = 'flex';
+  document.getElementById('pagination-info').textContent =
+    `${data.total.toLocaleString()} records · Page ${data.page} of ${data.pages}`;
+
+  const btns = document.getElementById('pagination-btns');
+  btns.innerHTML = '';
+
+  const addBtn = (label, page, disabled=false, active=false) => {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (active ? ' active' : '');
+    b.textContent = label;
+    b.disabled = disabled;
+    b.onclick = () => { state.page = page; loadRecords(); };
+    btns.appendChild(b);
+  };
+
+  addBtn('‹', data.page - 1, data.page <= 1);
+  const start = Math.max(1, data.page - 2);
+  const end   = Math.min(data.pages, start + 4);
+  for (let p = start; p <= end; p++) addBtn(p, p, false, p === data.page);
+  addBtn('›', data.page + 1, data.page >= data.pages);
+}
+
+// ── Zones filter ──────────────────────────────────────────────────────────────
+async function loadZones() {
+  const zones = await fetch('/api/zones').then(r => r.json());
+  const sel = document.getElementById('filter-zone');
+  zones.forEach(z => {
+    const o = document.createElement('option');
+    o.value = z; o.textContent = z;
+    sel.appendChild(o);
+  });
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+function fmtDate(s) {
+  const d = new Date(s);
+  const day = d.toLocaleDateString('en-GB', { weekday: 'short' });
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return [day, date];
+}
+
+function fmtDateStr(s) {
+  const d = new Date(s);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function fmtDateTime(s) {
+  const d = new Date(s);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) +
+    ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function pct(a, total) {
+  if (!total) return 0;
+  return Math.round((a / total) * 100);
+}
+
+function dirBadge(dir) {
+  if (dir === 'left')   return '<span class="badge badge-left">← Left</span>';
+  if (dir === 'right')  return '<span class="badge badge-right">→ Right</span>';
+  return `<span class="badge" style="background:#f1f5f9;color:#64748b">${dir || '—'}</span>`;
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.shortcut').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.shortcut').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setDates(parseInt(btn.dataset.days));
+    loadAll();
+  });
+});
+
+document.getElementById('refresh-btn').addEventListener('click', loadAll);
+
+document.getElementById('date-from').addEventListener('change', e => {
+  state.from = e.target.value;
+  document.querySelectorAll('.shortcut').forEach(b => b.classList.remove('active'));
+  loadAll();
+});
+
+document.getElementById('date-to').addEventListener('change', e => {
+  state.to = e.target.value;
+  document.querySelectorAll('.shortcut').forEach(b => b.classList.remove('active'));
+  loadAll();
+});
+
+function switchView(viewName, pushHistory = true) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const tab = document.querySelector(`[data-view="${viewName}"]`);
+  if (tab) tab.classList.add('active');
+  state.view = viewName;
+  document.getElementById('view-' + viewName).classList.add('active');
+  if (pushHistory) {
+    history.pushState({ view: viewName, from: state.from, to: state.to }, '', '#' + viewName);
+  }
+  loadAll();
+}
+
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchView(tab.dataset.view));
+});
+
+window.addEventListener('popstate', e => {
+  if (e.state && e.state.view) {
+    if (e.state.from) { state.from = e.state.from; document.getElementById('date-from').value = state.from; }
+    if (e.state.to)   { state.to   = e.state.to;   document.getElementById('date-to').value   = state.to; }
+    switchView(e.state.view, false);
+  } else {
+    // No more history — push them back in rather than leaving the page
+    history.pushState({ view: state.view, from: state.from, to: state.to }, '', '#' + state.view);
+  }
+});
+
+document.getElementById('filter-zone').addEventListener('change', e => {
+  state.filterZone = e.target.value;
+  state.page = 1;
+  loadRecords();
+});
+
+document.getElementById('filter-direction').addEventListener('change', e => {
+  state.filterDirection = e.target.value;
+  state.page = 1;
+  loadRecords();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+setDates(14);
+loadZones();
+// Push initial history entry so back button has somewhere to go
+history.replaceState({ view: 'overview', from: state.from, to: state.to }, '', '#overview');
+loadAll();
+</script>
+</body>
+</html>
