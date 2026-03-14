@@ -164,6 +164,15 @@ def main():
         sys.exit(1)
     log.info(f"Server reachable — status: {status}")
 
+    # Run DB migration to ensure retry columns exist
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import database as db
+        db.migrate_job_locks()
+        log.info("DB migration check complete")
+    except Exception as e:
+        log.warning(f"DB migration skipped (no local DB access): {e}")
+
     tmp_dir = tempfile.mkdtemp(prefix="traffic_worker_")
     log.info(f"Temp dir: {tmp_dir}")
 
@@ -238,12 +247,18 @@ def main():
                 log.info(f"  Processed in {proc_time:.1f}s — {len(vehicles)} vehicle(s)")
 
             except Exception as e:
-                log.error(f"  Processing failed: {e}")
+                err = str(e).lower()
+                retryable = any(x in err for x in (
+                    'moov atom', 'invalid data', 'could not read',
+                    'cannot open', 'end of file', 'truncated',
+                ))
+                log.error(f"  Processing failed ({'will retry' if retryable else 'permanent'}): {e}")
                 traceback.print_exc()
                 api_post(server, "/api/jobs/fail", {
                     "job_id":    job_id,
                     "worker_id": WORKER_ID,
                     "reason":    str(e)[:500],
+                    "retryable": retryable,
                 })
                 _cleanup(local_path)
                 continue

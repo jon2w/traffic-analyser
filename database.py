@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS job_locks (
     locked_at   DATETIME,
     status      ENUM('pending','processing','done','failed') DEFAULT 'pending',
     fail_reason VARCHAR(512),
+    retry_count INT DEFAULT 0,
+    retry_after DATETIME DEFAULT NULL,
     INDEX idx_status (status),
     INDEX idx_locked_at (locked_at)
 );
@@ -101,6 +103,25 @@ def _connect(database=DB_NAME):
         user=DB_USER, password=DB_PASSWORD,
         autocommit=False
     )
+
+
+def migrate_job_locks():
+    """Safely add retry_count and retry_after columns if they don't exist yet."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SHOW COLUMNS FROM job_locks LIKE 'retry_count'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "ALTER TABLE job_locks ADD COLUMN retry_count INT DEFAULT 0"
+                )
+            cursor.execute("SHOW COLUMNS FROM job_locks LIKE 'retry_after'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "ALTER TABLE job_locks ADD COLUMN retry_after DATETIME DEFAULT NULL"
+                )
+    except Exception as e:
+        print(f"migrate_job_locks: {e}")
 
 
 @contextmanager
@@ -295,7 +316,7 @@ def job_claim_next(worker_id):
     """
     with get_connection() as conn:
         cursor = conn.cursor()
-        # Reclaim stale locks first
+        # Reclaim stale processing locks
         cursor.execute("""
             UPDATE job_locks
             SET status='pending', worker_id=NULL, locked_at=NULL
@@ -303,11 +324,22 @@ def job_claim_next(worker_id):
               AND locked_at < DATE_SUB(NOW(), INTERVAL %s MINUTE)
         """, (JOB_LOCK_STALE_MINUTES,))
 
-        # Claim next pending job atomically
+        # Reclaim failed jobs whose retry_after has passed
+        cursor.execute("""
+            UPDATE job_locks
+            SET status='pending', worker_id=NULL, locked_at=NULL
+            WHERE status='failed'
+              AND retry_after IS NOT NULL
+              AND retry_after <= NOW()
+              AND retry_count < 3
+        """)
+
+        # Claim next pending job atomically (respect retry_after)
         cursor.execute("""
             UPDATE job_locks
             SET status='processing', worker_id=%s, locked_at=NOW()
             WHERE status='pending'
+              AND (retry_after IS NULL OR retry_after <= NOW())
             ORDER BY id
             LIMIT 1
         """, (worker_id,))
@@ -335,14 +367,39 @@ def job_complete(job_id, worker_id):
         )
 
 
-def job_fail(job_id, worker_id, reason=""):
-    """Mark a job as failed so it can be retried or inspected."""
+def job_fail(job_id, worker_id, reason="", retryable=False):
+    """Mark a job as failed. If retryable=True, schedule a retry with backoff."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE job_locks SET status='failed', fail_reason=%s WHERE id=%s AND worker_id=%s",
-            (reason[:512], job_id, worker_id)
-        )
+        if retryable:
+            # Increment retry count and set retry_after with exponential backoff
+            cursor.execute(
+                "SELECT retry_count FROM job_locks WHERE id=%s", (job_id,)
+            )
+            row = cursor.fetchone()
+            retry_count = (row[0] if row else 0) + 1
+            # 2min, 5min, 10min backoff
+            delay_minutes = [2, 5, 10][min(retry_count - 1, 2)]
+            if retry_count <= 3:
+                cursor.execute("""
+                    UPDATE job_locks
+                    SET status='failed', fail_reason=%s,
+                        retry_count=%s,
+                        retry_after=DATE_ADD(NOW(), INTERVAL %s MINUTE)
+                    WHERE id=%s AND worker_id=%s
+                """, (reason[:512], retry_count, delay_minutes, job_id, worker_id))
+            else:
+                # Exhausted retries — mark permanently failed
+                cursor.execute("""
+                    UPDATE job_locks
+                    SET status='failed', fail_reason=%s, retry_after=NULL
+                    WHERE id=%s AND worker_id=%s
+                """, (reason[:512], job_id, worker_id))
+        else:
+            cursor.execute(
+                "UPDATE job_locks SET status='failed', fail_reason=%s WHERE id=%s AND worker_id=%s",
+                (reason[:512], job_id, worker_id)
+            )
 
 
 def job_release(job_id, worker_id):

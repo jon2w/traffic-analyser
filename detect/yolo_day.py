@@ -6,7 +6,8 @@ import cv2
 import os
 import numpy as np
 import torch
-torch.backends.nnpack.enabled = False
+if hasattr(torch.backends, 'nnpack'):
+    torch.backends.nnpack.enabled = False
 
 from config import (YOLO_MODEL, YOLO_CONFIDENCE, YOLO_CLASSES, YOLO_DEVICE)
 
@@ -24,7 +25,8 @@ def _get_model():
             raise ImportError("Run: pip install ultralytics")
         print(f"Loading YOLO model: {YOLO_MODEL}")
         _model = YOLO(YOLO_MODEL)
-        torch.backends.nnpack.enabled = False
+        if hasattr(torch.backends, 'nnpack'):
+            torch.backends.nnpack.enabled = False
     return _model
 
 

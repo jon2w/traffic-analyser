@@ -533,7 +533,8 @@ def api_jobs_fail():
         if reason in ("dry_run", "download_failed"):
             db.job_release(job_id, worker_id)
         else:
-            db.job_fail(job_id, worker_id, reason)
+            retryable = data.get("retryable", False)
+            db.job_fail(job_id, worker_id, reason, retryable=retryable)
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
