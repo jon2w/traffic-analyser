@@ -42,7 +42,7 @@ NIGHT_BRIGHTNESS_THRESHOLD = 60
 YOLO_MODEL       = "yolov8n.pt"    # nano=fast, small=yolov8s.pt, medium=yolov8m.pt
 YOLO_CONFIDENCE  = 0.35            # minimum detection confidence
 YOLO_CLASSES     = [2, 3, 5, 7]   # COCO: car, motorcycle, bus, truck
-YOLO_DEVICE      = "cpu"           # "cpu" or "cuda" if GPU available
+YOLO_DEVICE      = "cuda"           # "cpu" or "cuda" if GPU available
 
 # --- Night mode (colour light detection) ---
 # Headlight detection (white/yellow blobs)

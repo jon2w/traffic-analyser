@@ -45,11 +45,15 @@ def detect(frame):
     """
     model = _get_model()
 
+    device = YOLO_DEVICE
+    if device == "cuda" and not torch.cuda.is_available():
+        device = "cpu"
+
     results = model.track(
         frame,
         conf=YOLO_CONFIDENCE,
         classes=YOLO_CLASSES,
-        device=YOLO_DEVICE,
+        device=device,
         verbose=False,
         tracker="bytetrack.yaml",
         persist=True,   # keep track state between calls

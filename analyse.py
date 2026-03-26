@@ -137,6 +137,7 @@ def point_in_polygon(x, y, polygon, frame_w, frame_h):
 
 
 def open_writer(output_path, fps, frame_w, frame_h):
+    output_path = os.path.expanduser(output_path)
     for codec in ["avc1", "mp4v", "MJPG"]:
         fourcc = cv2.VideoWriter_fourcc(*codec)
         w = cv2.VideoWriter(output_path, fourcc, fps, (frame_w, frame_h))

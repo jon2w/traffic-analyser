@@ -272,8 +272,9 @@ JOB_LOCK_STALE_MINUTES = 15
 def job_queue_populate(recordings_root, camera=None):
     """
     Populate job_locks with all unprocessed recordings not already in the queue.
-    Safe to call repeatedly — uses INSERT IGNORE to skip existing entries.
-    Returns count of new jobs added.
+    Safe to call repeatedly — uses INSERT IGNORE for genuinely new files, and
+    resets stuck failed jobs (retry_after=NULL, retry_count<3) back to pending.
+    Returns count of new or reset jobs.
     """
     import os
     added = 0
@@ -298,6 +299,19 @@ def job_queue_populate(recordings_root, camera=None):
                         (full,)
                     )
                     if cursor.fetchone():
+                        continue
+                    # Reset stuck failed jobs (never got a retry scheduled)
+                    cursor.execute("""
+                        UPDATE job_locks
+                        SET status='pending', worker_id=NULL, locked_at=NULL,
+                            retry_count=0, retry_after=NULL
+                        WHERE filename=%s
+                          AND status='failed'
+                          AND retry_after IS NULL
+                          AND retry_count < 3
+                    """, (full,))
+                    if cursor.rowcount:
+                        added += 1
                         continue
                     cursor.execute(
                         "INSERT IGNORE INTO job_locks (filename, status) VALUES (%s, 'pending')",
@@ -331,7 +345,7 @@ def job_claim_next(worker_id):
             WHERE status='failed'
               AND retry_after IS NOT NULL
               AND retry_after <= NOW()
-              AND retry_count < 3
+              AND retry_count < 4
         """)
 
         # Claim next pending job atomically (respect retry_after)
