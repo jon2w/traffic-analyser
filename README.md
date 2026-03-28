@@ -6,6 +6,13 @@ or colour-based light detection (night).
 
 Live dashboard: **https://your-domain.com** *(optional — via Cloudflare Tunnel)*
 
+## Roadmap
+
+- [ ] Multi-user support — allow remote workers to submit results to a central database without needing local network access, reducing setup complexity
+- [ ] Speed calibration — investigate and correct the systematic underestimate in speed calculations
+- [ ] Improve failed job recovery — more robust reclaiming of jobs that time out or crash mid-processing
+- [ ] Settings control panel — UI for tuning motion detection and tracking parameters without editing config files directly
+
 ---
 
 ## Architecture
