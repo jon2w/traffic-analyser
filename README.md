@@ -4,7 +4,7 @@ Analyses vehicle traffic from MotionEye recordings. Detects, tracks, and
 measures speed of vehicles across configurable road zones using YOLOv8 (day)
 or colour-based light detection (night).
 
-Live dashboard: **https://traffic.justridingalong.com**
+Live dashboard: **https://your-domain.com** *(optional — via Cloudflare Tunnel)*
 
 ---
 
@@ -13,14 +13,14 @@ Live dashboard: **https://traffic.justridingalong.com**
 ```
 IP Camera
     │
-    │  RTSP stream  http://192.168.1.224:8080/
+    │  RTSP stream
     ▼
 Raspberry Pi
     │
     │  stream
     ▼
 NAS — MotionEye Docker (port 8765)
-    │  records to /volume1/traffic/recordings/Camera1/YYYY-MM-DD/HH-MM-SS.mp4
+    │  records to <NAS_RECORDINGS>/Camera1/YYYY-MM-DD/HH-MM-SS.mp4
     │
     ├──► web_ui.py (port 5002)  ◄──  Worker machines poll for jobs
     │         job queue in MariaDB         │
@@ -36,8 +36,8 @@ NAS — MotionEye Docker (port 8765)
                                         dashboard.py (port 5003)
                                               │
                                               ▼
-                                   Cloudflare Tunnel
-                              traffic.justridingalong.com
+                                   Cloudflare Tunnel (optional)
+                                       your-domain.com
 ```
 
 The NAS is only used for recording and storage — it is too slow to run analysis
@@ -52,18 +52,17 @@ processing the same file twice.
 
 | Component | Detail |
 |---|---|
-| NAS address | `192.168.1.99`, SSH port `4362`, user `jon` |
-| Project path | `/volume1/traffic/traffic_analyser` |
+| NAS address | `<NAS_IP>`, SSH port `<SSH_PORT>` |
+| Project path | `/volume1/traffic/traffic_analyser` *(Synology default — adjust for your NAS)* |
 | Python venv | `/volume1/traffic/traffic_venv` |
 | Recordings | `/volume1/traffic/recordings/Camera1/YYYY-MM-DD/HH-MM-SS.mp4` |
 | Annotated output | `/volume1/traffic/annotated` |
-| MariaDB | port `3307`, user `traffic_user`, password `384r7tyb$_T8w7yef` |
+| MariaDB | port `3307`, user `<DB_USER>`, password `<DB_PASSWORD>` |
 | Web UI (admin) | port `5002` |
 | Dashboard | port `5003` |
-| Pi camera stream | `http://192.168.1.224:8080/` |
+| Pi camera stream | `http://<PI_IP>:8080/` |
 | MotionEye Docker | port `8765` |
 | Git repo | `github.com/jon2w/traffic-analyser` |
-| Cloudflare tunnel ID | `7e3f3698-1b7d-4300-b614-080370dab148` |
 
 ---
 
@@ -167,7 +166,7 @@ pip install "numpy<2"
 ### Step 6 — Start the worker
 
 ```
-python worker.py --server http://192.168.1.99:5002
+python worker.py --server http://<NAS_IP>:5002
 ```
 
 The worker will poll the server for jobs and process them continuously. To stop
@@ -175,11 +174,11 @@ it press `Ctrl+C`.
 
 **Other useful flags:**
 ```
-python worker.py --server http://192.168.1.99:5002 --once      # process one job and exit
-python worker.py --server http://192.168.1.99:5002 --dry-run   # show jobs without processing
-python worker.py --server http://192.168.1.99:5002 --day       # force day mode
-python worker.py --server http://192.168.1.99:5002 --night     # force night mode
-python worker.py --server http://192.168.1.99:5002 --poll 30   # poll every 30 seconds
+python worker.py --server http://<NAS_IP>:5002 --once      # process one job and exit
+python worker.py --server http://<NAS_IP>:5002 --dry-run   # show jobs without processing
+python worker.py --server http://<NAS_IP>:5002 --day       # force day mode
+python worker.py --server http://<NAS_IP>:5002 --night     # force night mode
+python worker.py --server http://<NAS_IP>:5002 --poll 30   # poll every 30 seconds
 ```
 
 ### Convenience script (Windows)
@@ -190,7 +189,7 @@ full command each time. Create it in the project root:
 ```bat
 cd /d %~dp0
 call venv\Scripts\activate
-python worker.py --server http://192.168.1.99:5002
+python worker.py --server http://<NAS_IP>:5002
 ```
 
 Double-click it to start the worker.
@@ -245,7 +244,7 @@ pip install "numpy<2"
 ### Step 5 — Start the worker
 
 ```bash
-python worker.py --server http://192.168.1.99:5002
+python worker.py --server http://<NAS_IP>:5002
 ```
 
 ---
@@ -254,7 +253,7 @@ python worker.py --server http://192.168.1.99:5002
 
 SSH into the NAS first:
 ```bash
-ssh -p 4362 jon@192.168.1.99
+ssh -p <SSH_PORT> <username>@<NAS_IP>
 ```
 
 ### Web UI (admin, port 5002)
@@ -279,7 +278,7 @@ nohup python dashboard.py --port 5003 2>/dev/null &
 sudo systemctl restart cloudflared
 ```
 
-Config: `/etc/cloudflared/config.yml`
+Config: `/etc/cloudflared/config.yml` — update with your own tunnel ID and domain.
 
 ### Batch processing on the NAS (slow — use workers instead)
 
@@ -311,9 +310,8 @@ python analyse.py --input /path/to/recording.mp4 --save-db       # write results
 
 ## Dashboard
 
-The dashboard is publicly available at **https://traffic.justridingalong.com**
-
-Local access: `http://192.168.1.99:5003`
+The dashboard runs locally at `http://<NAS_IP>:5003` and can optionally be
+exposed publicly via a Cloudflare Tunnel.
 
 **Tabs:** Overview · Daily · Week Comparison · Patterns · Records
 
@@ -329,8 +327,8 @@ Local access: `http://192.168.1.99:5003`
 DB_HOST      = "127.0.0.1"
 DB_PORT      = 3307
 DB_NAME      = "traffic"
-DB_USER      = "traffic_user"
-DB_PASSWORD  = "384r7tyb$_T8w7yef"
+DB_USER      = "<DB_USER>"
+DB_PASSWORD  = "<DB_PASSWORD>"
 
 RECORDINGS_ROOT = "/volume1/traffic/recordings"
 
