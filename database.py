@@ -348,6 +348,16 @@ def job_claim_next(worker_id):
               AND retry_count < 4
         """)
 
+        # Reclaim failed jobs with no retry scheduled (non-permanent failures,
+        # i.e. retry_count < 3 — permanent failures are marked with retry_count=3)
+        cursor.execute("""
+            UPDATE job_locks
+            SET status='pending', worker_id=NULL, locked_at=NULL
+            WHERE status='failed'
+              AND retry_after IS NULL
+              AND retry_count < 3
+        """)
+
         # Claim next pending job atomically (respect retry_after)
         cursor.execute("""
             UPDATE job_locks
@@ -410,8 +420,9 @@ def job_fail(job_id, worker_id, reason="", retryable=False):
                     WHERE id=%s AND worker_id=%s
                 """, (reason[:512], job_id, worker_id))
         else:
+            # Permanent failure — set retry_count=3 so it is not auto-reclaimed
             cursor.execute(
-                "UPDATE job_locks SET status='failed', fail_reason=%s WHERE id=%s AND worker_id=%s",
+                "UPDATE job_locks SET status='failed', fail_reason=%s, retry_count=3 WHERE id=%s AND worker_id=%s",
                 (reason[:512], job_id, worker_id)
             )
 
