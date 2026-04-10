@@ -24,6 +24,7 @@ from flask import (Flask, Response, jsonify, render_template_string,
 
 from config import RECORDINGS_ROOT
 import database as db
+import auth
 
 app = Flask(__name__)
 
@@ -549,9 +550,387 @@ def api_jobs_status():
         return jsonify({"error": str(e)}), 500
 
 
+# ── Remote submission API (authenticated) ──────────────────────────────────────
+
+@app.route("/api/submit_results", methods=["POST"])
+@auth.require_auth
+def api_submit_results(user):
+    """
+    Accept analysis results from a remote user who has run the analysis locally.
+    This is the same flow as worker.py, but for users submitting their own files
+    without downloading from the server.
+    
+    Request JSON:
+    {
+        "filename": "intersection_2024-04-10_14-30-00.mp4",
+        "location_name": "Downtown Intersection",
+        "camera_name": "User Camera",
+        "recorded_at": "2024-04-10T14:30:00",
+        "duration_s": 600.0,
+        "frame_width": 1280,
+        "frame_height": 720,
+        "fps": 25.0,
+        "is_night": false,
+        "vehicles": [
+            {
+                "zone": "main_road",
+                "direction": "left",
+                "speed_kmh": 45.2,
+                "vehicle_class": "car",
+                "confidence": 0.95,
+                "track_frames": 120,
+                "duration_s": 4.8,
+                "first_seen_ms": 1000,
+                "last_seen_ms": 5800,
+                "thumbnail_path": null,
+                "track_points": [
+                    [0, 100, 200],      # [timestamp_ms, x, y]
+                    [40, 102, 205]
+                ]
+            }
+        ]
+    }
+    
+    Returns:
+        {
+            "ok": true,
+            "recording_id": 42,
+            "vehicle_count": 47,
+            "message": "Results submitted successfully"
+        }
+    """
+    # Validate user can submit
+    if not user["is_admin"] and user["submission_type"] != "remote":
+        return jsonify({"error": "User account not configured for remote submissions"}), 403
+    
+    data = request.json or {}
+    
+    # Validate required fields
+    required_fields = ["filename", "duration_s", "frame_width", "frame_height", "fps", "vehicles"]
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+    
+    try:
+        filename = data["filename"]
+        location_name = data.get("location_name", "Unknown")[:128]
+        camera_name = data.get("camera_name", f"user_{user['username']}")[:64]
+        recorded_at_str = data.get("recorded_at")
+        duration_s = float(data["duration_s"])
+        frame_width = int(data["frame_width"])
+        frame_height = int(data["frame_height"])
+        fps = float(data["fps"])
+        is_night = bool(data.get("is_night", False))
+        vehicles_data = data.get("vehicles", [])
+        
+        # Parse recorded_at
+        if recorded_at_str:
+            try:
+                recorded_at = datetime.fromisoformat(recorded_at_str)
+            except:
+                recorded_at = datetime.now()
+        else:
+            recorded_at = datetime.now()
+        
+        # Create unique filename for server storage
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        user_dir = os.path.join(RECORDINGS_ROOT, f"remote_user_{user['id']}")
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Store as metadata file (.json) so we can retrieve submission details
+        basename = os.path.splitext(os.path.basename(filename))[0]
+        safe_name = re.sub(r'[^\w\-]', '_', basename)[:64]
+        stored_filename = f"{safe_name}_{ts}"
+        metadata_path = os.path.join(user_dir, f"{stored_filename}.json")
+        
+        # Save metadata
+        with open(metadata_path, 'w') as f:
+            json.dump({
+                "original_filename": filename,
+                "user_id": user["id"],
+                "username": user["username"],
+                "location_name": location_name,
+                "submitted_at": datetime.now().isoformat(),
+                "recorded_at": recorded_at.isoformat(),
+            }, f)
+        
+        # Insert recording into database
+        recording_id = db.insert_recording(
+            filename=metadata_path,  # Store path to metadata
+            camera_name=camera_name,
+            recorded_at=recorded_at,
+            duration_s=duration_s,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            fps=fps,
+            is_night=is_night,
+            user_id=user["id"],
+            location_name=location_name,
+            submission_source="remote"
+        )
+        
+        # Insert vehicles and track points
+        vehicle_count = 0
+        for v in vehicles_data:
+            try:
+                vehicle_id = db.insert_vehicle(
+                    recording_id=recording_id,
+                    zone=v.get("zone", "unknown"),
+                    direction=v.get("direction", "unknown"),
+                    speed_kmh=float(v.get("speed_kmh", 0)) if v.get("speed_kmh") else None,
+                    vehicle_class=v.get("vehicle_class", "unknown"),
+                    confidence=float(v.get("confidence", 0)) if v.get("confidence") else None,
+                    track_frames=int(v.get("track_frames", 0)),
+                    duration_s=float(v.get("duration_s", 0)) if v.get("duration_s") else None,
+                    first_seen_ms=int(v.get("first_seen_ms", 0)),
+                    last_seen_ms=int(v.get("last_seen_ms", 0)),
+                    thumbnail_path=v.get("thumbnail_path"),
+                    detected_at=datetime.now()
+                )
+                
+                # Insert track points if provided
+                track_points = v.get("track_points", [])
+                if track_points:
+                    db.insert_track_points(vehicle_id, track_points)
+                
+                vehicle_count += 1
+            except Exception as e:
+                print(f"Warning: Failed to insert vehicle: {e}")
+                continue
+        
+        # Update vehicle count in recording
+        db.update_recording_count(recording_id, vehicle_count)
+        
+        return jsonify({
+            "ok": True,
+            "recording_id": recording_id,
+            "vehicle_count": vehicle_count,
+            "message": f"Results submitted successfully — {vehicle_count} vehicle(s) recorded"
+        }), 201
+    
+    except ValueError as e:
+        return jsonify({"error": f"Invalid data format: {str(e)}"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to submit results: {str(e)}"}), 500
+
+
+@app.route("/api/user/jobs", methods=["GET"])
+@auth.require_auth
+def api_user_jobs(user):
+    """
+    Get list of jobs submitted by the current user.
+    
+    Query params:
+        - status: 'pending', 'processing', 'done', 'failed' (optional)
+        - limit: max results (default 50)
+        - offset: pagination (default 0)
+    """
+    status_filter = request.args.get("status", "")
+    limit = int(request.args.get("limit", 50))
+    offset = int(request.args.get("offset", 0))
+    
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            
+            # Allow admins to see all, others only their own
+            if user["is_admin"]:
+                query = """
+                    SELECT r.id, r.filename, r.camera_name, r.location_name,
+                           r.recorded_at, r.submitted_at, r.processed_at, r.duration_s,
+                           r.vehicle_count, u.username,
+                           jl.status as job_status, jl.fail_reason
+                    FROM recordings r
+                    LEFT JOIN users u ON r.user_id = u.id
+                    LEFT JOIN job_locks jl ON r.filename = jl.filename
+                    WHERE 1=1
+                """
+                params = []
+            else:
+                query = """
+                    SELECT r.id, r.filename, r.camera_name, r.location_name,
+                           r.recorded_at, r.submitted_at, r.processed_at, r.duration_s,
+                           r.vehicle_count,
+                           jl.status as job_status, jl.fail_reason
+                    FROM recordings r
+                    LEFT JOIN job_locks jl ON r.filename = jl.filename
+                    WHERE r.user_id = %s
+                """
+                params = [user["id"]]
+            
+            if status_filter:
+                query += " AND jl.status = %s"
+                params.append(status_filter)
+            
+            query += " ORDER BY r.submitted_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cursor.execute(query, params)
+            jobs = cursor.fetchall()
+            
+            # Convert Decimal objects to float
+            for job in jobs:
+                if job.get("duration_s") and hasattr(job["duration_s"], '__float__'):
+                    job["duration_s"] = float(job["duration_s"])
+            
+            return jsonify({"jobs": jobs})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user/results/<int:recording_id>", methods=["GET"])
+@auth.require_auth
+def api_user_results(user, recording_id):
+    """
+    Get vehicle detection results for a specific recording.
+    User can only access their own recordings (unless admin).
+    """
+    # Check access
+    if not auth.user_can_access_recording(user, recording_id):
+        return jsonify({"error": "Access denied"}), 403
+    
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            
+            # Get recording info
+            cursor.execute("""
+                SELECT r.id, r.filename, r.location_name, r.recorded_at,
+                       r.processed_at, r.duration_s, r.vehicle_count,
+                       u.username
+                FROM recordings r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE r.id = %s
+            """, (recording_id,))
+            recording = cursor.fetchone()
+            
+            if not recording:
+                return jsonify({"error": "Recording not found"}), 404
+            
+            # Get vehicles
+            cursor.execute("""
+                SELECT id, zone, direction, speed_kmh, vehicle_class,
+                       confidence, track_frames, duration_s,
+                       first_seen_ms, last_seen_ms, thumbnail_path, detected_at
+                FROM vehicles
+                WHERE recording_id = %s
+                ORDER BY first_seen_ms
+            """, (recording_id,))
+            vehicles = cursor.fetchall()
+            
+            # Convert Decimals to float
+            for v in vehicles:
+                for key in ("speed_kmh", "confidence", "duration_s"):
+                    if key in v and v[key] and hasattr(v[key], '__float__'):
+                        v[key] = float(v[key])
+            
+            return jsonify({
+                "recording": recording,
+                "vehicles": vehicles,
+                "vehicle_count": len(vehicles)
+            })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Admin API for managing users ───────────────────────────────────────────────
+
+@app.route("/api/admin/users", methods=["GET"])
+@auth.require_admin
+def api_admin_users(user):
+    """
+    List all users (admin only).
+    """
+    try:
+        users = db.list_users()
+        return jsonify({"users": users})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/users", methods=["POST"])
+@auth.require_admin
+def api_admin_create_user(user):
+    """
+    Create a new user (admin only).
+    
+    Request body:
+        {
+            "username": "user1",
+            "display_name": "User One",
+            "is_admin": false,
+            "submission_type": "remote"
+        }
+    """
+    data = request.json or {}
+    username = data.get("username", "").strip()
+    display_name = data.get("display_name", username)
+    is_admin = data.get("is_admin", False)
+    submission_type = data.get("submission_type", "remote")
+    
+    if not username:
+        return jsonify({"error": "username required"}), 400
+    
+    user_id, api_key = db.create_user(
+        username=username,
+        display_name=display_name,
+        is_admin=is_admin,
+        submission_type=submission_type
+    )
+    
+    if not user_id:
+        return jsonify({"error": "User already exists or database error"}), 400
+    
+    return jsonify({
+        "ok": True,
+        "user_id": user_id,
+        "username": username,
+        "api_key": api_key,
+        "message": "User created. Save the API key — it cannot be retrieved later!"
+    }), 201
+
+
+@app.route("/api/admin/users/<int:user_id>/regenerate-key", methods=["POST"])
+@auth.require_admin
+def api_admin_regenerate_key(user, user_id):
+    """Regenerate API key for a user (admin only)."""
+    try:
+        new_key = db.regenerate_api_key(user_id)
+        return jsonify({
+            "ok": True,
+            "new_api_key": new_key,
+            "message": "New API key generated. Save it — it cannot be retrieved later!"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/users/<int:target_user_id>/deactivate", methods=["POST"])
+@auth.require_admin
+def api_admin_deactivate_user(user, target_user_id):
+    """Deactivate a user (admin only)."""
+    if target_user_id == user["id"]:
+        return jsonify({"error": "Cannot deactivate yourself"}), 400
+    
+    try:
+        db.deactivate_user(target_user_id)
+        return jsonify({"ok": True, "message": "User deactivated"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Run migrations
+    try:
+        db.migrate_job_locks()
+        db.migrate_multi_user_support()
+    except Exception as e:
+        print(f"Warning: Migration failed: {e}")
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--host", default="0.0.0.0")

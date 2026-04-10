@@ -6,12 +6,23 @@ or colour-based light detection (night).
 
 Live dashboard: **https://your-domain.com** *(optional — via Cloudflare Tunnel)*
 
+## What's New — Multi-User Support
+
+You can now allow **remote users to submit their own analysis results** without needing access to the local network. Users analyze videos locally (same as worker.py) and submit only the results. Features:
+
+- **User authentication** — Simple API-key authentication, no login required
+- **Results submission** — Users submit detection data after local analysis
+- **Per-user tracking** — Results filtered by user and location name
+- **Admin dashboard** — Manage users, regenerate API keys, control access
+- **CloudFlare Tunnel integration** — Expose the server to the internet safely without port forwarding
+- **Desktop GUI app** — Non-technical users can analyze and submit with one click (no command line)
+
 ## Roadmap
 
-- [ ] Multi-user support — allow remote workers to submit results to a central database without needing local network access, reducing setup complexity
 - [ ] Speed calibration — investigate and correct the systematic underestimate in speed calculations
 - [ ] Improve failed job recovery — more robust reclaiming of jobs that time out or crash mid-processing
 - [ ] Settings control panel — UI for tuning motion detection and tracking parameters without editing config files directly
+- [ ] Statistics export — generate reports by user/location/time period
 
 ---
 
@@ -83,11 +94,15 @@ traffic-analyser/
 ├── web_ui.py           Admin interface + job queue API (port 5002)
 ├── dashboard.py        Read-only public dashboard (port 5003)
 ├── database.py         MariaDB interface, schema setup, job queue functions
+├── auth.py             Authentication system (API key validation)
 ├── tracker.py          Centroid tracker + vehicle tracker
 ├── config.py           All tunable parameters
 ├── zones_loader.py     Loads zone polygon definitions from zones.json
 ├── zones.json          Zone polygon definitions (edit via tune_zones.py)
 ├── tune_zones.py       Interactive zone polygon editor
+├── traffic_gui.py      Desktop GUI app for non-technical users
+├── traffic_client.py   Python CLI client for power users
+├── TrafficAnalyzer.bat Desktop app launcher (Windows only — double-click to run)
 ├── watchdog.sh         NAS cron script — keeps web_ui.py and batch.py running
 ├── run_batch.sh        Simple batch launcher (activates venv, runs batch.py)
 ├── sync_from_pi.sh     (Legacy) NAS pulls recordings from Pi via rsync
@@ -380,6 +395,356 @@ Controls: `1–9` select zone · click to add/remove points · `S` save and quit
 `NIGHT_ROI_TOP` and `NIGHT_ROI_BOTTOM` define the horizontal band where
 lights are detected. Set them to exclude background buildings and foreground
 bushes. The orange lines in annotated output show the current boundaries.
+
+---
+
+## Remote User Submissions via CloudFlare Tunnel
+
+Allow remote users to record videos locally, run analysis locally, and submit only the **results** (vehicles data) to your server. This is the same workflow as distributed workers, but for users with their own local videos.
+
+### Workflow
+
+```
+Remote User's Machine
+    │
+    ├─ Records video locally
+    │  (or uses existing video file)
+    │
+    ├─ Runs analysis locally:
+    │  python analyse.py --input video.mp4 --no-show
+    │  → Produces results.json with vehicle data
+    │
+    └─ Submits ONLY the results to server:
+       POST /api/submit_results + results.json + API key
+       │
+       ▼ (via HTTPS CloudFlare Tunnel)
+       
+Server (Your NAS)
+    │
+    ├─ Receives results
+    ├─ Stores in MariaDB (linked to user)
+    ├─ Can filter by user/location in dashboard
+    │
+    ▼
+    
+Dashboard shows statistics by user/location
+```
+
+### 1. Set up CloudFlare Tunnel
+
+If you haven't already, install and configure CloudFlare Tunnel on your NAS to expose the web_ui on a public domain.
+
+### 2. Create Users (via Admin API)
+
+Create user accounts using curl or the provided `traffic_client.py`. Users receive an API key that grants them access to submit results and view their own data.
+
+```bash
+# Create a new remote user (admin API on localhost)
+curl -X POST http://nas-local-ip:5002/api/admin/users \
+  -H "Authorization: Bearer <your-admin-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "alice",
+    "display_name": "Alice Smith",
+    "submission_type": "remote"
+  }'
+
+# Response:
+# {
+#   "ok": true,
+#   "user_id": 123,
+#   "username": "alice",
+#   "api_key": "abc123def456...",
+#   "message": "User created. Save the API key — it cannot be retrieved later!"
+# }
+```
+
+Save the API key — it cannot be retrieved later (users can request key regeneration).
+
+### 3. Submit Results (User Workflow)
+
+Users run analysis locally and submit results:
+
+```bash
+# Step 1: Record video locally or use existing file
+# (e.g., phone video, security camera, dashcam)
+
+# Step 2: Run analysis on their machine
+python analyse.py --input my_video.mp4 --no-show
+# → Produces results.json
+
+# Step 3: Submit results to server
+curl -X POST https://your-domain.com/api/submit_results \
+  -H "Authorization: Bearer <user-api-key>" \
+  -H "Content-Type: application/json" \
+  -d @results.json
+  
+# Add location metadata:
+curl -X POST https://your-domain.com/api/submit_results \
+  -H "Authorization: Bearer <user-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "intersection_2024-04-10_14-30.mp4",
+    "location_name": "Downtown Main Street",
+    "camera_name": "Ring Camera",
+    ...rest of results.json...
+  }'
+
+# Response:
+# {
+#   "ok": true,
+#   "recording_id": 42,
+#   "vehicle_count": 47,
+#   "message": "Results submitted successfully — 47 vehicle(s) recorded"
+# }
+```
+
+Or use the example Python client:
+
+```bash
+python traffic_client.py --server https://your-domain.com \
+  --api-key <user-api-key> \
+  --submit results.json \
+  --location "Downtown Main Street" \
+  --filename "intersection_2024-04-10_14-30.mp4"
+```
+
+### 4. Check Results
+
+Users can view their submissions and statistics:
+
+```bash
+# Get list of user's submissions
+curl -H "Authorization: Bearer <user-api-key>" \
+  https://your-domain.com/api/user/jobs
+
+# Get detailed results for a recording
+curl -H "Authorization: Bearer <user-api-key>" \
+  https://your-domain.com/api/user/results/42
+
+# Use the client
+python traffic_client.py --server https://your-domain.com \
+  --api-key <user-api-key> \
+  --list-jobs
+
+python traffic_client.py --server https://your-domain.com \
+  --api-key <user-api-key> \
+  --results 42
+```
+
+### API Reference for Remote Users
+
+#### POST /api/submit_results
+Submit analysis results from a local analysis.
+
+**Request:**
+Send the results.json output from `analyse.py` with optional metadata fields.
+
+```json
+{
+  "filename": "intersection_2024-04-10_14-30.mp4",
+  "camera_name": "Ring Camera",
+  "location_name": "Downtown Main Street",
+  "recorded_at": "2024-04-10T14:30:00",
+  "duration_s": 600.0,
+  "frame_width": 1280,
+  "frame_height": 720,
+  "fps": 25.0,
+  "is_night": false,
+  "vehicles": [
+    {
+      "zone": "main_road",
+      "direction": "left",
+      "speed_kmh": 45.2,
+      "vehicle_class": "car",
+      "confidence": 0.95,
+      "track_frames": 120,
+      "duration_s": 4.8,
+      "first_seen_ms": 1000,
+      "last_seen_ms": 5800,
+      "thumbnail_path": null,
+      "track_points": [
+        [0, 100, 200],
+        [40, 102, 205]
+      ]
+    }
+  ]
+}
+```
+
+**Headers:**
+- `Authorization: Bearer <api-key>`
+- `Content-Type: application/json`
+
+**Response:** 201 Created
+```json
+{
+  "ok": true,
+  "recording_id": 42,
+  "vehicle_count": 47,
+  "message": "Results submitted successfully — 47 vehicle(s) recorded"
+}
+```
+
+#### GET /api/user/jobs
+List user's submitted jobs with processing status.
+
+**Query params:**
+- `status` — filter by 'pending', 'processing', 'done', 'failed'
+- `limit` — max results (default 50)
+- `offset` — pagination offset (default 0)
+
+**Headers:**
+- `Authorization: Bearer <api-key>`
+
+**Response:**
+```json
+{
+  "jobs": [
+    {
+      "id": 42,
+      "filename": "intersection_2024-04-10_14-30.mp4",
+      "location_name": "Downtown Main Street",
+      "recorded_at": "2024-04-10T14:30:00",
+      "submitted_at": "2024-04-10T14:35:00",
+      "processed_at": "2024-04-10T14:35:30",
+      "duration_s": 600.0,
+      "vehicle_count": 47,
+      "job_status": "done"
+    }
+  ]
+}
+```
+
+#### GET /api/user/results/{recording_id}
+Get detailed vehicle detection results for a recording.
+
+**Headers:**
+- `Authorization: Bearer <api-key>`
+
+**Response:**
+```json
+{
+  "recording": {
+    "id": 42,
+    "filename": "intersection_2024-04-10_14-30.mp4",
+    "location_name": "Downtown Main Street",
+    "recorded_at": "2024-04-10T14:30:00",
+    "vehicle_count": 47
+  },
+  "vehicles": [
+    {
+      "id": 1001,
+      "zone": "main_road",
+      "direction": "left",
+      "speed_kmh": 42.5,
+      "vehicle_class": "car",
+      "confidence": 0.95,
+      "first_seen_ms": 1000,
+      "last_seen_ms": 5000
+    }
+  ]
+}
+```
+
+### Dashboard Filtering
+
+The public dashboard now supports filtering by user and location:
+
+```
+https://your-domain.com/api/summary?user=alice&location_name=Downtown%20Intersection
+https://your-domain.com/api/daily?from=2024-04-01&to=2024-04-10&user=alice
+https://your-domain.com/api/users
+https://your-domain.com/api/locations
+https://your-domain.com/api/user/123/summary
+https://your-domain.com/api/location/Downtown%20Main%20Street/summary
+```
+
+### Admin Endpoints (Internal Only)
+
+These are for managing users and should be kept behind your firewall or on localhost only:
+
+```bash
+# List all users
+curl -H "Authorization: Bearer <admin-api-key>" \
+  http://nas-local-ip:5002/api/admin/users
+
+# Create a new user
+curl -X POST http://nas-local-ip:5002/api/admin/users \
+  -H "Authorization: Bearer <admin-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "bob", "display_name": "Bob Jones"}'
+
+# Regenerate user's API key
+curl -X POST http://nas-local-ip:5002/api/admin/users/{user_id}/regenerate-key \
+  -H "Authorization: Bearer <admin-api-key>"
+
+# Deactivate a user
+curl -X POST http://nas-local-ip:5002/api/admin/users/{user_id}/deactivate \
+  -H "Authorization: Bearer <admin-api-key>"
+```
+
+---
+
+## Desktop GUI App (for Non-Technical Users)
+
+For users who aren't comfortable with command line, there's a simple desktop application that handles everything in one window: file selection, analysis, and result submission.
+
+### Windows Users — Quick Start
+
+1. Download `traffic_gui.py` and `TrafficAnalyzer.bat` from the project
+2. Double-click **TrafficAnalyzer.bat** — the app will launch
+3. Click ⚙ **Settings** and enter:
+   - **Server URL**: `https://your-domain.com` (your CloudFlare Tunnel)
+   - **API Key**: your personal API key
+4. Click **Choose File...** to select a video
+5. Enter location name (optional)
+6. Click **Process & Submit**
+7. Watch the output panel as it analyzes and submits
+
+**That's it!** Results are submitted automatically.
+
+### Requirements
+
+- Python 3.11+ (download from https://www.python.org/)
+  - ⚠️ When installing, check **"Add Python to PATH"**
+  - Tkinter is built into Python, no extra installation needed
+- An API key from your admin (ask the server owner)
+
+### Features
+
+✓ **Settings are saved** — Only set up once  
+✓ **Real-time output** — See analysis progress live  
+✓ **Error messages** — Clear feedback if something goes wrong  
+✓ **Location memory** — Remembers your last used location  
+✓ **Auto-submit** — Results uploaded automatically when done  
+✓ **No command line needed** — Just click buttons  
+
+### How It Works
+
+1. **Choose video** — Select any .mp4 file from your computer
+2. **Enter location** (optional) — "Main Street", "Parking Lot", etc.
+3. **Process** — App runs `analyse.py` locally on your machine
+4. **Submit** — Results automatically sent to server with your API key
+5. **Confirmation** — See success/error message with recording ID
+
+### Troubleshooting
+
+**"Python is not installed"**
+- Download Python from https://www.python.org/downloads/
+- Run the installer and check **"Add Python to PATH"**
+- Restart your computer
+- Double-click `TrafficAnalyzer.bat` again
+
+**"Settings saved but app is slow"**
+- First analysis takes time (especially on older machines)
+- Watch the output panel for progress
+- Be patient during YOLO model loading
+
+**"Submission failed"**
+- Check Settings — server URL and API key correct?
+- Check internet connection
+- Ask your server admin to verify your account is active
 
 ---
 

@@ -33,11 +33,27 @@ FLUSH PRIVILEGES;
 """.format(db=DB_NAME, user=DB_USER, password=DB_PASSWORD)
 
 TABLES_SQL = """
+CREATE TABLE IF NOT EXISTS users (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    username        VARCHAR(128) NOT NULL UNIQUE,
+    api_key         VARCHAR(64) NOT NULL UNIQUE,
+    display_name    VARCHAR(128),
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_active       BOOLEAN DEFAULT TRUE,
+    is_admin        BOOLEAN DEFAULT FALSE,
+    submission_type ENUM('local','remote') DEFAULT 'remote',
+    INDEX idx_api_key (api_key),
+    INDEX idx_is_active (is_active)
+);
+
 CREATE TABLE IF NOT EXISTS recordings (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     filename        VARCHAR(512) NOT NULL UNIQUE,
+    user_id         INT,
     camera_name     VARCHAR(64),
+    location_name   VARCHAR(128),
     recorded_at     DATETIME,
+    submitted_at    DATETIME,
     processed_at    DATETIME,
     duration_s      FLOAT,
     frame_width     INT,
@@ -45,7 +61,12 @@ CREATE TABLE IF NOT EXISTS recordings (
     fps             FLOAT,
     is_night        BOOLEAN,
     vehicle_count   INT DEFAULT 0,
-    INDEX idx_recorded_at (recorded_at)
+    submission_source ENUM('local','remote') DEFAULT 'local',
+    INDEX idx_user_id (user_id),
+    INDEX idx_recorded_at (recorded_at),
+    INDEX idx_submitted_at (submitted_at),
+    INDEX idx_location_name (location_name),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS vehicles (
@@ -124,6 +145,62 @@ def migrate_job_locks():
         print(f"migrate_job_locks: {e}")
 
 
+def migrate_multi_user_support():
+    """Safely add multi-user support columns and tables."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Add user_id, location_name, submitted_at, submission_source columns to recordings if they don't exist
+            cursor.execute("SHOW COLUMNS FROM recordings LIKE 'user_id'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "ALTER TABLE recordings ADD COLUMN user_id INT"
+                )
+                cursor.execute(
+                    "ALTER TABLE recordings ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL"
+                )
+            
+            cursor.execute("SHOW COLUMNS FROM recordings LIKE 'location_name'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "ALTER TABLE recordings ADD COLUMN location_name VARCHAR(128)"
+                )
+                cursor.execute(
+                    "ALTER TABLE recordings ADD INDEX idx_location_name (location_name)"
+                )
+            
+            cursor.execute("SHOW COLUMNS FROM recordings LIKE 'submitted_at'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "ALTER TABLE recordings ADD COLUMN submitted_at DATETIME"
+                )
+                cursor.execute(
+                    "ALTER TABLE recordings ADD INDEX idx_submitted_at (submitted_at)"
+                )
+            
+            cursor.execute("SHOW COLUMNS FROM recordings LIKE 'submission_source'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "ALTER TABLE recordings ADD COLUMN submission_source ENUM('local','remote') DEFAULT 'local'"
+                )
+            
+            # Create localhost user for local submissions if not exists
+            cursor.execute("SELECT id FROM users WHERE username='localhost'")
+            if not cursor.fetchone():
+                import secrets
+                api_key = secrets.token_hex(32)
+                cursor.execute("""
+                    INSERT INTO users (username, api_key, display_name, is_admin, submission_type)
+                    VALUES ('localhost', %s, 'Local Submissions', TRUE, 'local')
+                """, (api_key,))
+                conn.commit()
+                print(f"Created 'localhost' user with API key: {api_key}")
+            
+    except Exception as e:
+        print(f"migrate_multi_user_support: {e}")
+
+
 @contextmanager
 def get_connection():
     conn = _connect()
@@ -171,23 +248,26 @@ def setup(root_password):
 # ─── Recording operations ─────────────────────────────────────────────────────
 
 def insert_recording(filename, camera_name, recorded_at, duration_s,
-                     frame_width, frame_height, fps, is_night):
+                     frame_width, frame_height, fps, is_night,
+                     user_id=None, location_name=None, submission_source="local"):
     """
     Insert a new recording row. If this filename was previously processed,
     delete the old record first (cascades to vehicles and track_points).
     Returns the new recording id.
     """
+    submitted_at = datetime.now() if submission_source == "remote" else None
+    
     with get_connection() as conn:
         cursor = conn.cursor()
         # Delete previous results for this file if they exist
         cursor.execute("DELETE FROM recordings WHERE filename=%s", (filename,))
         cursor.execute("""
             INSERT INTO recordings 
-                (filename, camera_name, recorded_at, processed_at,
-                 duration_s, frame_width, frame_height, fps, is_night)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (filename, camera_name, recorded_at, datetime.now(),
-              duration_s, frame_width, frame_height, fps, is_night))
+                (filename, user_id, camera_name, location_name, recorded_at, submitted_at, 
+                 processed_at, duration_s, frame_width, frame_height, fps, is_night, submission_source)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (filename, user_id, camera_name, location_name, recorded_at, submitted_at, 
+              datetime.now(), duration_s, frame_width, frame_height, fps, is_night, submission_source))
         return cursor.lastrowid
 
 
@@ -446,6 +526,98 @@ def job_queue_status():
             FROM job_locks GROUP BY status
         """)
         return {row["status"]: row["count"] for row in cursor.fetchall()}
+
+
+# ─── User operations ──────────────────────────────────────────────────────────
+
+def create_user(username, display_name, is_admin=False, submission_type='remote'):
+    """
+    Create a new user with an auto-generated API key.
+    Returns (user_id, api_key) or (None, None) if user already exists.
+    """
+    import secrets
+    api_key = secrets.token_hex(32)
+    
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO users (username, api_key, display_name, is_admin, submission_type)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (username, api_key, display_name or username, is_admin, submission_type))
+            return cursor.lastrowid, api_key
+    except:
+        return None, None
+
+
+def validate_api_key(api_key):
+    """
+    Validate an API key. Returns user dict (including user_id, username, is_admin) or None.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, username, display_name, is_admin, submission_type
+            FROM users WHERE api_key=%s AND is_active=TRUE
+        """, (api_key,))
+        return cursor.fetchone()
+
+
+def get_user_by_id(user_id):
+    """Get user information by ID."""
+    with get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, username, display_name, is_admin, submission_type, is_active
+            FROM users WHERE id=%s
+        """, (user_id,))
+        return cursor.fetchone()
+
+
+def get_localhost_user():
+    """Get the special 'localhost' user for local submissions."""
+    with get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, username, api_key FROM users WHERE username='localhost'
+        """)
+        return cursor.fetchone()
+
+
+def list_users():
+    """List all active users."""
+    with get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, username, display_name, is_admin, submission_type, created_at
+            FROM users WHERE is_active=TRUE
+            ORDER BY created_at DESC
+        """)
+        return cursor.fetchall()
+
+
+def deactivate_user(user_id):
+    """Deactivate a user (soft delete)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET is_active=FALSE WHERE id=%s",
+            (user_id,)
+        )
+
+
+def regenerate_api_key(user_id):
+    """Generate a new API key for a user. Returns the new key."""
+    import secrets
+    new_key = secrets.token_hex(32)
+    
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET api_key=%s WHERE id=%s",
+            (new_key, user_id)
+        )
+    return new_key
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────

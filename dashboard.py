@@ -63,6 +63,42 @@ def _parse_dates():
     return date_from, date_to
 
 
+def _build_filter_sql(date_from, date_to):
+    """
+    Build SQL WHERE clause and params for common filtering.
+    Supports: user, location_name, user_id, location
+    
+    Returns (where_clause, params_list)
+    """
+    where_parts = ["r.recorded_at >= %s AND r.recorded_at < %s"]
+    params = [date_from, date_to]
+    
+    # Filter by username or user_id
+    user_filter = request.args.get("user") or request.args.get("username")
+    if user_filter:
+        where_parts.append("u.username = %s")
+        params.append(user_filter)
+    
+    user_id_filter = request.args.get("user_id")
+    if user_id_filter:
+        where_parts.append("r.user_id = %s")
+        params.append(int(user_id_filter))
+    
+    # Filter by location
+    location_filter = request.args.get("location") or request.args.get("location_name")
+    if location_filter:
+        where_parts.append("r.location_name = %s")
+        params.append(location_filter)
+    
+    # Filter by submission source (local or remote)
+    source_filter = request.args.get("source")
+    if source_filter:
+        where_parts.append("r.submission_source = %s")
+        params.append(source_filter)
+    
+    return " AND ".join(where_parts), params
+
+
 # ── Static files ──────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -104,7 +140,9 @@ def api_download():
 @app.route("/api/summary")
 def api_summary():
     date_from, date_to = _parse_dates()
-    row = _query("""
+    where_clause, params = _build_filter_sql(date_from, date_to)
+    
+    row = _query(f"""
         SELECT
             COUNT(*)                                AS total_vehicles,
             ROUND(AVG(v.speed_kmh), 1)              AS avg_speed,
@@ -116,8 +154,9 @@ def api_summary():
             SUM(r.is_night)                         AS night_recordings
         FROM vehicles v
         JOIN recordings r ON v.recording_id = r.id
-        WHERE r.recorded_at >= %s AND r.recorded_at < %s
-    """, (date_from, date_to), one=True)
+        LEFT JOIN users u ON r.user_id = u.id
+        WHERE {where_clause}
+    """, params, one=True)
     # Convert Decimal/None safely
     return jsonify({k: (float(v) if v is not None else None) for k, v in row.items()})
 
@@ -551,6 +590,108 @@ def api_delete_vehicle(vehicle_id):
         return jsonify({"ok": True, "deleted": vehicle_id})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ── User and location filtering APIs ───────────────────────────────────────────
+
+@app.route("/api/users")
+def api_users():
+    """
+    Get list of users who have submitted data.
+    Returns user_id, username, recording_count, vehicle_count.
+    """
+    rows = _query("""
+        SELECT
+            u.id AS user_id,
+            u.username,
+            u.display_name,
+            COUNT(DISTINCT r.id) AS recording_count,
+            COUNT(DISTINCT v.id) AS vehicle_count
+        FROM users u
+        LEFT JOIN recordings r ON u.id = r.user_id
+        LEFT JOIN vehicles v ON r.id = v.recording_id
+        WHERE u.is_active = TRUE
+        GROUP BY u.id, u.username
+        ORDER BY vehicle_count DESC
+    """)
+    return jsonify({"users": rows})
+
+
+@app.route("/api/locations")
+def api_locations():
+    """
+    Get list of locations with data summary.
+    Returns location_name, recording_count, vehicle_count, avg_speed.
+    """
+    rows = _query("""
+        SELECT
+            COALESCE(r.location_name, 'Unknown') AS location_name,
+            COUNT(DISTINCT r.id) AS recording_count,
+            COUNT(DISTINCT v.id) AS vehicle_count,
+            ROUND(AVG(v.speed_kmh), 1) AS avg_speed
+        FROM recordings r
+        LEFT JOIN vehicles v ON r.id = v.recording_id
+        WHERE r.location_name IS NOT NULL
+        GROUP BY r.location_name
+        ORDER BY vehicle_count DESC
+    """)
+    return jsonify({"locations": [{
+        k: (float(v) if v is not None and k == 'avg_speed' and hasattr(v, '__float__') else v)
+        for k, v in row.items()
+    } for row in rows]})
+
+
+@app.route("/api/user/<int:user_id>/summary")
+def api_user_summary(user_id):
+    """
+    Get summary statistics for a specific user.
+    """
+    date_from, date_to = _parse_dates()
+    row = _query("""
+        SELECT
+            COUNT(DISTINCT v.id)                    AS total_vehicles,
+            ROUND(AVG(v.speed_kmh), 1)              AS avg_speed,
+            ROUND(MAX(v.speed_kmh), 1)              AS max_speed,
+            COUNT(DISTINCT r.id)                    AS recordings_processed,
+            MIN(r.recorded_at)                      AS first_submission,
+            MAX(r.recorded_at)                      AS last_submission
+        FROM recordings r
+        LEFT JOIN vehicles v ON r.id = v.recording_id
+        WHERE r.user_id = %s
+          AND r.recorded_at >= %s AND r.recorded_at < %s
+    """, (user_id, date_from, date_to), one=True)
+    
+    if row and row.get('total_vehicles'):
+        return jsonify({k: (
+            str(v) if hasattr(v, 'isoformat') else
+            float(v) if v is not None and hasattr(v, '__float__') else v
+        ) for k, v in row.items()})
+    return jsonify({"error": "No data for user"}), 404
+
+
+@app.route("/api/location/<location_name>/summary")
+def api_location_summary(location_name):
+    """
+    Get summary statistics for a specific location.
+    """
+    date_from, date_to = _parse_dates()
+    row = _query("""
+        SELECT
+            COUNT(DISTINCT v.id)                    AS total_vehicles,
+            ROUND(AVG(v.speed_kmh), 1)              AS avg_speed,
+            ROUND(MAX(v.speed_kmh), 1)              AS max_speed,
+            COUNT(DISTINCT r.id)                    AS recordings_processed,
+            COUNT(DISTINCT r.user_id)               AS unique_users
+        FROM recordings r
+        LEFT JOIN vehicles v ON r.id = v.recording_id
+        WHERE r.location_name = %s
+          AND r.recorded_at >= %s AND r.recorded_at < %s
+    """, (location_name, date_from, date_to), one=True)
+    
+    if row and row.get('total_vehicles'):
+        return jsonify({k: (float(v) if v is not None and hasattr(v, '__float__') else v) 
+                       for k, v in row.items()})
+    return jsonify({"error": "No data for location"}), 404
 
 
 if __name__ == "__main__":
