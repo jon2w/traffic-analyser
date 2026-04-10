@@ -246,7 +246,7 @@ class TrafficAnalyzerApp:
         """Show settings dialog."""
         settings_win = tk.Toplevel(self.root)
         settings_win.title("Settings")
-        settings_win.geometry("500x250")
+        settings_win.geometry("500x380")
         settings_win.transient(self.root)
         settings_win.grab_set()
         

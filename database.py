@@ -632,6 +632,16 @@ if __name__ == "__main__":
                         help="MariaDB root password for --setup")
     parser.add_argument("--status", action="store_true",
                         help="Show row counts")
+    parser.add_argument("--create-user", metavar="USERNAME",
+                        help="Create a user and print their API key")
+    parser.add_argument("--display-name", default=None,
+                        help="Display name for --create-user")
+    parser.add_argument("--admin", action="store_true",
+                        help="Make the new user an admin (use with --create-user)")
+    parser.add_argument("--list-users", action="store_true",
+                        help="List all users")
+    parser.add_argument("--regenerate-key", metavar="USERNAME",
+                        help="Regenerate API key for a user")
     args = parser.parse_args()
 
     if args.setup:
@@ -662,3 +672,48 @@ if __name__ == "__main__":
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 count = cursor.fetchone()[0]
                 print(f"  {table:20s}: {count:,} rows")
+
+    if args.create_user:
+        user_id, api_key = create_user(
+            username=args.create_user,
+            display_name=args.display_name or args.create_user,
+            is_admin=args.admin,
+        )
+        if user_id:
+            print(f"  User     : {args.create_user}")
+            print(f"  User ID  : {user_id}")
+            print(f"  Admin    : {args.admin}")
+            print(f"  API key  : {api_key}")
+            print()
+            print("  Save the API key — it cannot be retrieved later.")
+        else:
+            print(f"  Error: user '{args.create_user}' already exists.")
+
+    if args.list_users:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, username, display_name, is_admin, is_active, submission_type, created_at FROM users ORDER BY id"
+            )
+            rows = cursor.fetchall()
+        if not rows:
+            print("  No users found.")
+        else:
+            print(f"  {'ID':<5} {'Username':<20} {'Display name':<25} {'Admin':<6} {'Active':<7} {'Type':<8} Created")
+            print(f"  {'-'*90}")
+            for row in rows:
+                print(f"  {row[0]:<5} {row[1]:<20} {row[2]:<25} {'yes' if row[3] else 'no':<6} {'yes' if row[4] else 'no':<7} {row[5]:<8} {row[6]}")
+
+    if args.regenerate_key:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE username=%s", (args.regenerate_key,))
+            row = cursor.fetchone()
+        if not row:
+            print(f"  Error: user '{args.regenerate_key}' not found.")
+        else:
+            new_key = regenerate_api_key(row[0])
+            print(f"  User    : {args.regenerate_key}")
+            print(f"  New key : {new_key}")
+            print()
+            print("  Save the API key — it cannot be retrieved later.")
