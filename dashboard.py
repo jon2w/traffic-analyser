@@ -704,7 +704,7 @@ def api_submit_results(user):
     """Accept analysis results from a remote user running analysis locally."""
     data = request.json or {}
 
-    required_fields = ["filename", "duration_s", "frame_width", "frame_height", "fps", "vehicles"]
+    required_fields = ["filename", "vehicles"]
     for field in required_fields:
         if field not in data:
             return jsonify({"error": f"Missing required field: {field}"}), 400
@@ -714,10 +714,10 @@ def api_submit_results(user):
         location_name  = data.get("location_name", "Unknown")[:128]
         camera_name    = data.get("camera_name", f"user_{user['username']}")[:64]
         recorded_at_str = data.get("recorded_at")
-        duration_s     = float(data["duration_s"])
-        frame_width    = int(data["frame_width"])
-        frame_height   = int(data["frame_height"])
-        fps            = float(data["fps"])
+        duration_s     = float(data["duration_s"]) if data.get("duration_s") is not None else 0.0
+        frame_width    = int(data["frame_width"]) if data.get("frame_width") is not None else 0
+        frame_height   = int(data["frame_height"]) if data.get("frame_height") is not None else 0
+        fps            = float(data["fps"]) if data.get("fps") is not None else 0.0
         is_night       = bool(data.get("is_night", False))
         vehicles_data  = data.get("vehicles", [])
 
