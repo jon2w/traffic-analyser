@@ -755,6 +755,21 @@ class ZoneEditorWindow:
         else:
             self._load_video(path)
 
+    def _normalize_zones(self, fw, fh):
+        """
+        Convert zones stored in pixel coordinates (legacy format from tune_zones.py)
+        to fractional (0-1) coordinates used by this editor.
+        Detects pixel format by checking if any coordinate value exceeds 1.
+        """
+        for z in self.zones:
+            if not z["polygon"]:
+                continue
+            if any(abs(v) > 1 for pt in z["polygon"] for v in pt):
+                z["polygon"] = [
+                    [round(x / fw, 4), round(y / fh, 4)]
+                    for x, y in z["polygon"]
+                ]
+
     def _load_image(self, path):
         import cv2
         frame = cv2.imread(path)
@@ -765,6 +780,8 @@ class ZoneEditorWindow:
             self.cap.release()
             self.cap = None
         self.base_frame = frame
+        fh, fw = frame.shape[:2]
+        self._normalize_zones(fw, fh)
         self._set_nav(False)
         self._render()
 
@@ -789,6 +806,8 @@ class ZoneEditorWindow:
             messagebox.showerror("Error", "Could not read frame from video.", parent=self.win)
             return
         self.base_frame = frame
+        fh, fw = frame.shape[:2]
+        self._normalize_zones(fw, fh)
         self.cur_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
         self._set_nav(True)
         self._render()
