@@ -16,11 +16,15 @@ Serves:
 """
 
 import argparse
+import json
 import os
+import re
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_from_directory, send_file
 
 from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+import database as db
+import auth
 
 try:
     import mysql.connector
@@ -692,6 +696,94 @@ def api_location_summary(location_name):
         return jsonify({k: (float(v) if v is not None and hasattr(v, '__float__') else v) 
                        for k, v in row.items()})
     return jsonify({"error": "No data for location"}), 404
+
+
+@app.route("/api/submit_results", methods=["POST"])
+@auth.require_auth
+def api_submit_results(user):
+    """Accept analysis results from a remote user running analysis locally."""
+    data = request.json or {}
+
+    required_fields = ["filename", "duration_s", "frame_width", "frame_height", "fps", "vehicles"]
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+
+    try:
+        filename       = data["filename"]
+        location_name  = data.get("location_name", "Unknown")[:128]
+        camera_name    = data.get("camera_name", f"user_{user['username']}")[:64]
+        recorded_at_str = data.get("recorded_at")
+        duration_s     = float(data["duration_s"])
+        frame_width    = int(data["frame_width"])
+        frame_height   = int(data["frame_height"])
+        fps            = float(data["fps"])
+        is_night       = bool(data.get("is_night", False))
+        vehicles_data  = data.get("vehicles", [])
+
+        if recorded_at_str:
+            try:
+                recorded_at = datetime.fromisoformat(recorded_at_str)
+            except Exception:
+                recorded_at = datetime.now()
+        else:
+            recorded_at = datetime.now()
+
+        # Use just the basename as the stored filename (no disk write needed here)
+        basename = os.path.splitext(os.path.basename(filename))[0]
+        safe_name = re.sub(r"[^\w\-]", "_", basename)[:64]
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stored_filename = f"remote_{user['id']}_{safe_name}_{ts}"
+
+        recording_id = db.insert_recording(
+            filename=stored_filename,
+            camera_name=camera_name,
+            recorded_at=recorded_at,
+            duration_s=duration_s,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            fps=fps,
+            is_night=is_night,
+            user_id=user["id"],
+            location_name=location_name,
+            submission_source="remote",
+        )
+
+        vehicle_count = 0
+        for v in vehicles_data:
+            try:
+                vehicle_id = db.insert_vehicle(
+                    recording_id=recording_id,
+                    zone=v.get("zone", "unknown"),
+                    direction=v.get("direction", "unknown"),
+                    speed_kmh=float(v["speed_kmh"]) if v.get("speed_kmh") is not None else None,
+                    vehicle_class=v.get("vehicle_class", "unknown"),
+                    confidence=float(v["confidence"]) if v.get("confidence") is not None else None,
+                    track_frames=int(v.get("track_frames", 0)),
+                    duration_s=float(v["duration_s"]) if v.get("duration_s") is not None else None,
+                    first_seen_ms=int(v.get("first_seen_ms", 0)),
+                    last_seen_ms=int(v.get("last_seen_ms", 0)),
+                    thumbnail_path=v.get("thumbnail_path"),
+                    detected_at=datetime.now(),
+                )
+                track_points = v.get("track_points", [])
+                if track_points:
+                    db.insert_track_points(vehicle_id, track_points)
+                vehicle_count += 1
+            except Exception as e:
+                print(f"Warning: failed to insert vehicle: {e}")
+
+        db.update_recording_count(recording_id, vehicle_count)
+
+        return jsonify({
+            "ok": True,
+            "recording_id": recording_id,
+            "vehicle_count": vehicle_count,
+            "message": f"Results submitted successfully — {vehicle_count} vehicle(s) recorded",
+        }), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
