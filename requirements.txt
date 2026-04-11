@@ -7,3 +7,4 @@ ultralytics>=8.0.0        # YOLOv8
 mysql-connector-python>=8.0.0
 flask>=2.0.0              # Web UI and dashboard
 requests>=2.25.0          # HTTP client for worker
+Pillow>=9.0.0             # Image display in desktop GUI zone editor
