@@ -474,11 +474,13 @@ class TrafficAnalyzerApp:
                 )
             base_dir = os.path.dirname(analyse_path)
 
+            results_path = os.path.join(base_dir, "results.json")
             cmd = [
                 sys.executable,
                 analyse_path,
                 "--input", filepath,
-                "--no-show"
+                "--no-show",
+                "--output-json", results_path,
             ]
 
             self.log_output(f"Running: {' '.join(cmd)}\n")
@@ -512,28 +514,15 @@ class TrafficAnalyzerApp:
             self.log_output("Step 2: Submitting results to server...")
             self.log_output("=" * 60 + "\n")
             
-            # Look for results.json in the same directory or current directory
-            possible_paths = [
-                os.path.join(base_dir, "results.json"),
-                "results.json",
-                os.path.join(os.path.dirname(filepath), "results.json")
-            ]
-            
-            results_path = None
-            for path in possible_paths:
-                if os.path.exists(path):
-                    results_path = path
-                    break
-            
-            if not results_path:
-                self.log_output(f"❌ Results file not found. Looked in: {possible_paths}")
+            if not os.path.exists(results_path):
+                self.log_output(f"❌ Results file not found: {results_path}")
                 self.status_var.set("Results file not found!")
                 messagebox.showerror("Error", "Could not find results.json after analysis")
                 return
-            
+
             self.log_output(f"Found results: {results_path}\n")
-            
-            with open(results_path, 'r') as f:
+
+            with open(results_path, "r", encoding="utf-8") as f:
                 results = json.load(f)
             
             # Add metadata

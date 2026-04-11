@@ -57,6 +57,8 @@ def get_args():
                    help="Save vehicle thumbnail images")
     p.add_argument("--force", action="store_true",
                    help="Re-process even if already in database")
+    p.add_argument("--output-json", default=None, metavar="PATH",
+                   help="Save vehicle results as JSON to this path")
     return p.parse_args()
 
 
@@ -429,8 +431,9 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
 
 
 if __name__ == "__main__":
+    import json as _json
     args = get_args()
-    analyse(
+    vehicles = analyse(
         input_path   = args.input,
         output_path  = args.output,
         force_night  = args.night,
@@ -440,3 +443,7 @@ if __name__ == "__main__":
         save_thumbs  = args.save_thumbs,
         force        = args.force,
     )
+    if args.output_json and vehicles is not None:
+        with open(args.output_json, "w", encoding="utf-8") as _f:
+            _json.dump({"vehicles": vehicles}, _f, indent=2, default=str)
+        print(f"Results written to {args.output_json}")
