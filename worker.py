@@ -66,6 +66,8 @@ def get_args():
                    help="Process one file then exit")
     p.add_argument("--timeout", type=int, default=300,
                    help="Per-file processing timeout in seconds (default: 300)")
+    p.add_argument("--user-id", type=int, default=None,
+                   help="User ID to associate with processed recordings")
     return p.parse_args()
 
 
@@ -269,6 +271,7 @@ def main():
                 "job_id":    job_id,
                 "worker_id": WORKER_ID,
                 "vehicles":  vehicles,
+                "user_id":   args.user_id,
             })
 
             if result and result.get("ok"):

@@ -427,6 +427,7 @@ def api_jobs_complete():
     job_id    = data.get("job_id")
     worker_id = data.get("worker_id", "unknown")
     vehicles  = data.get("vehicles", [])
+    user_id   = data.get("user_id")
 
     if not job_id:
         return jsonify({"ok": False, "error": "missing job_id"}), 400
@@ -484,6 +485,7 @@ def api_jobs_complete():
             frame_width = frame_w, frame_height = frame_h,
             fps         = fps,
             is_night    = bool(is_night),
+            user_id     = user_id,
         )
         for v in vehicles:
             vehicle_id = db.insert_vehicle(
