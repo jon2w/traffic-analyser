@@ -144,10 +144,12 @@ def open_writer(output_path, fps, frame_w, frame_h):
         fourcc = cv2.VideoWriter_fourcc(*codec)
         w = cv2.VideoWriter(output_path, fourcc, fps, (frame_w, frame_h))
         if w.isOpened():
-            print(f"Video writer: {codec} → {output_path}")
+            print(f"Video writer: {codec} -> {output_path}")
             return w
-    print("WARNING: Could not open video writer")
-    return None
+    raise RuntimeError(
+        f"Could not open video writer for {output_path}. "
+        "Try installing openh264 or use a different output path."
+    )
 
 
 def parse_recording_time(filename):
@@ -244,7 +246,7 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration_s   = total_frames / fps if fps > 0 else 0
 
-    print(f"Video: {frame_w}×{frame_h} @ {fps:.1f} fps  "
+    print(f"Video: {frame_w}x{frame_h} @ {fps:.1f} fps  "
           f"({total_frames} frames, {duration_s:.1f}s)")
     print(f"File:  {input_path}")
 
@@ -286,7 +288,7 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
     t_prev      = time.time()
     fps_actual  = fps
 
-    print("\nProcessing — press Q to quit\n")
+    print("\nProcessing - press Q to quit\n")
 
     while True:
         ret, frame = cap.read()
@@ -370,7 +372,7 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
         all_vehicles.extend(vt.vehicles)
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    print(f"\n{'─'*55}")
+    print(f"\n{'-'*55}")
     print(f"Total vehicles : {len(all_vehicles)}")
     if all_vehicles:
         speeds = [v["speed_kmh"] for v in all_vehicles if v["speed_kmh"] > 1]
@@ -379,14 +381,14 @@ def analyse(input_path, output_path=None, force_night=False, force_day=False,
         if speeds:
             print(f"Average speed  : {sum(speeds)/len(speeds):.1f} km/h")
             print(f"Max speed      : {max(speeds):.1f} km/h")
-        print(f"Going right →  : {right}")
-        print(f"Going left  ←  : {left}")
+        print(f"Going right -> : {right}")
+        print(f"Going left  <- : {left}")
         by_class = {}
         for v in all_vehicles:
             by_class[v["vehicle_class"]] = by_class.get(v["vehicle_class"], 0) + 1
         for cls, count in sorted(by_class.items()):
             print(f"  {cls:12s}: {count}")
-    print(f"{'─'*55}\n")
+    print(f"{'-'*55}\n")
 
     # ── Database ──────────────────────────────────────────────────────────────
     if save_db and all_vehicles:

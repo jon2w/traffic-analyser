@@ -89,6 +89,7 @@ class TrafficAnalyzerApp:
         
         self.selected_file = None
         self.is_processing = False
+        self.annotated_path = None  # set after processing if save-annotated is on
         
         # Define colors
         self.bg_color = "#f0f0f0"
@@ -229,7 +230,43 @@ class TrafficAnalyzerApp:
             pady=12
         )
         self.process_btn.pack(fill=tk.X)
-        
+
+        # Options row
+        options_frame = tk.Frame(content_frame, bg=self.bg_color)
+        options_frame.pack(fill=tk.X, pady=(5, 5))
+
+        self.submit_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(
+            options_frame,
+            text="Submit results to server",
+            variable=self.submit_var,
+            font=("Arial", 10),
+            bg=self.bg_color,
+        ).pack(side=tk.LEFT, padx=(0, 20))
+
+        self.save_annotated_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            options_frame,
+            text="Save annotated video",
+            variable=self.save_annotated_var,
+            font=("Arial", 10),
+            bg=self.bg_color,
+        ).pack(side=tk.LEFT)
+
+        self.open_video_btn = tk.Button(
+            options_frame,
+            text="▶ Open annotated video",
+            font=("Arial", 10),
+            bg="#1a6b8a",
+            fg="white",
+            command=self.open_annotated_video,
+            relief=tk.FLAT,
+            padx=10,
+            pady=4,
+            state=tk.DISABLED,
+        )
+        self.open_video_btn.pack(side=tk.RIGHT)
+
         # Output panel
         output_frame = tk.LabelFrame(
             content_frame,
@@ -391,6 +428,13 @@ class TrafficAnalyzerApp:
         )
         cancel_btn.pack(side=tk.LEFT)
     
+    def open_annotated_video(self):
+        """Open the annotated video in the system default player."""
+        if self.annotated_path and os.path.exists(self.annotated_path):
+            os.startfile(self.annotated_path)
+        else:
+            messagebox.showerror("Error", "Annotated video file not found.")
+
     def show_zone_editor(self):
         ZoneEditorWindow(self.root)
 
@@ -426,45 +470,52 @@ class TrafficAnalyzerApp:
             messagebox.showerror("Error", f"File not found: {self.selected_file}")
             return
         
-        # Check settings
+        # Check settings only if submitting
+        submit_to_server = self.submit_var.get()
         server_url = get_config_value("server_url")
         api_key = get_config_value("api_key")
-        
-        if not server_url or not api_key:
+
+        if submit_to_server and (not server_url or not api_key):
             messagebox.showerror("Error", "Please configure server URL and API key in Settings!")
             return
-        
+
         # Save location name for next time
         location_name = self.location_var.get().strip()
         if location_name:
             set_config_value("last_location", location_name)
-        
+
+        save_annotated = self.save_annotated_var.get()
+
         # Run in background thread to avoid freezing UI
         thread = threading.Thread(
             target=self._process_and_submit_bg,
-            args=(self.selected_file, location_name, server_url, api_key)
+            args=(self.selected_file, location_name, server_url, api_key,
+                  submit_to_server, save_annotated)
         )
         thread.daemon = True
         thread.start()
     
-    def _process_and_submit_bg(self, filepath, location_name, server_url, api_key):
+    def _process_and_submit_bg(self, filepath, location_name, server_url, api_key,
+                               submit_to_server=True, save_annotated=False):
         """Background thread for processing and submission."""
         try:
             self.is_processing = True
+            self.annotated_path = None
             self.process_btn.config(state=tk.DISABLED)
+            self.open_video_btn.config(state=tk.DISABLED)
             self.output_text.config(state=tk.NORMAL)
             self.output_text.delete(1.0, tk.END)
             self.output_text.config(state=tk.DISABLED)
-            
+
             filename = Path(filepath).name
             self.log_output(f"Starting analysis of: {filename}\n")
             self.status_var.set("Processing...")
-            
+
             # Step 1: Run analyse.py
             self.log_output("=" * 60)
             self.log_output("Step 1: Running local analysis...")
             self.log_output("=" * 60 + "\n")
-            
+
             analyse_path = get_config_value("analyse_path", "analyse.py")
             # Resolve to absolute path relative to the GUI script's own directory
             # so it works correctly when launched via a desktop shortcut
@@ -482,6 +533,13 @@ class TrafficAnalyzerApp:
                 "--no-show",
                 "--output-json", results_path,
             ]
+
+            if save_annotated:
+                stem = Path(filepath).stem
+                annotated_path = os.path.join(base_dir, f"{stem}_annotated.mp4")
+                cmd += ["--output", annotated_path]
+            else:
+                annotated_path = None
 
             self.log_output(f"Running: {' '.join(cmd)}\n")
 
@@ -508,12 +566,28 @@ class TrafficAnalyzerApp:
                 return
             
             self.log_output("\n✓ Analysis complete!\n")
-            
+
+            # Show annotated video button if file was saved
+            if annotated_path and os.path.exists(annotated_path):
+                self.annotated_path = annotated_path
+                self.open_video_btn.config(state=tk.NORMAL)
+                self.log_output(f"Annotated video saved: {annotated_path}\n")
+
+            if not submit_to_server:
+                # Just show local results summary
+                if os.path.exists(results_path):
+                    with open(results_path, "r", encoding="utf-8") as f:
+                        results = json.load(f)
+                    vehicle_count = len(results.get("vehicles", []))
+                    self.log_output(f"Vehicles detected: {vehicle_count}")
+                self.status_var.set("✓ Analysis complete (not submitted)")
+                return
+
             # Step 2: Find and read results.json
             self.log_output("=" * 60)
             self.log_output("Step 2: Submitting results to server...")
             self.log_output("=" * 60 + "\n")
-            
+
             if not os.path.exists(results_path):
                 self.log_output(f"❌ Results file not found: {results_path}")
                 self.status_var.set("Results file not found!")
@@ -524,40 +598,40 @@ class TrafficAnalyzerApp:
 
             with open(results_path, "r", encoding="utf-8") as f:
                 results = json.load(f)
-            
+
             # Add metadata
             results["filename"] = filename
             if location_name:
                 results["location_name"] = location_name
             results["camera_name"] = "Desktop App"
-            
+
             # Step 3: Submit to server
             self.log_output(f"Submitting {len(results.get('vehicles', []))} vehicle(s) to server...\n")
-            
+
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
-            
+
             submit_url = f"{server_url}/api/submit_results"
             self.log_output(f"POST {submit_url}\n")
-            
+
             resp = requests.post(
                 submit_url,
                 headers=headers,
                 json=results,
                 timeout=60
             )
-            
+
             if resp.status_code == 201:
                 data = resp.json()
                 recording_id = data.get("recording_id")
                 vehicle_count = data.get("vehicle_count", 0)
-                
+
                 self.log_output(f"\n✓ Results submitted successfully!")
                 self.log_output(f"  Recording ID: {recording_id}")
                 self.log_output(f"  Vehicles detected: {vehicle_count}\n")
-                
+
                 self.status_var.set(f"✓ Complete! Recording #{recording_id}, {vehicle_count} vehicles")
                 messagebox.showinfo(
                     "Success!",
@@ -570,19 +644,19 @@ class TrafficAnalyzerApp:
                 try:
                     error_data = resp.json()
                     error_msg = error_data.get("error", error_msg)
-                except:
+                except Exception:
                     pass
-                
+
                 self.log_output(f"\n❌ Submission failed (HTTP {resp.status_code})")
                 self.log_output(f"Error: {error_msg}\n")
                 self.status_var.set("Submission failed!")
                 messagebox.showerror("Error", f"Submission failed:\n{error_msg}")
-        
+
         except Exception as e:
             self.log_output(f"\n❌ Error: {str(e)}\n")
             self.status_var.set("Error!")
             messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
-        
+
         finally:
             self.is_processing = False
             self.process_btn.config(state=tk.NORMAL)
