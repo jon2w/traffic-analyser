@@ -466,17 +466,23 @@ class TrafficAnalyzerApp:
             self.log_output("=" * 60 + "\n")
             
             analyse_path = get_config_value("analyse_path", "analyse.py")
-            base_dir = os.path.dirname(analyse_path) if os.path.dirname(analyse_path) else "."
-            
+            # Resolve to absolute path relative to the GUI script's own directory
+            # so it works correctly when launched via a desktop shortcut
+            if not os.path.isabs(analyse_path):
+                analyse_path = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), analyse_path
+                )
+            base_dir = os.path.dirname(analyse_path)
+
             cmd = [
                 sys.executable,
                 analyse_path,
                 "--input", filepath,
                 "--no-show"
             ]
-            
+
             self.log_output(f"Running: {' '.join(cmd)}\n")
-            
+
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -484,7 +490,8 @@ class TrafficAnalyzerApp:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                bufsize=1
+                bufsize=1,
+                cwd=base_dir,   # always run from project dir so results.json lands there
             )
             
             for line in proc.stdout:
