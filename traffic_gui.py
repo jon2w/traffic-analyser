@@ -18,7 +18,7 @@ Usage:
 """
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 import json
 import os
 import subprocess
@@ -144,6 +144,19 @@ class TrafficAnalyzerApp:
             pady=5
         )
         zones_btn.pack(side=tk.RIGHT, padx=(0, 5), pady=10)
+
+        batch_btn = tk.Button(
+            header_frame,
+            text="⊞ Batch Process",
+            font=("Arial", 10),
+            bg="#6d4c8a",
+            fg="white",
+            command=self.show_batch_processor,
+            relief=tk.FLAT,
+            padx=15,
+            pady=5
+        )
+        batch_btn.pack(side=tk.RIGHT, padx=(0, 5), pady=10)
         
         # ── Main Content ───────────────────────────────────────────────────────
         content_frame = tk.Frame(self.root, bg=self.bg_color)
@@ -428,6 +441,9 @@ class TrafficAnalyzerApp:
         )
         cancel_btn.pack(side=tk.LEFT)
     
+    def show_batch_processor(self):
+        BatchProcessWindow(self.root)
+
     def open_annotated_video(self):
         """Open the annotated video in the system default player."""
         if self.annotated_path and os.path.exists(self.annotated_path):
@@ -660,6 +676,403 @@ class TrafficAnalyzerApp:
         finally:
             self.is_processing = False
             self.process_btn.config(state=tk.NORMAL)
+
+
+# ─── Batch Processor ──────────────────────────────────────────────────────────
+
+class BatchProcessWindow:
+    """
+    Batch video processor.  Scans one or more folders recursively for .mp4 files,
+    skips anything already submitted (tracked locally + optionally synced from
+    server), and processes the remainder one by one.
+    """
+
+    SUBMITTED_FILE = Path.home() / ".traffic_analyzer_submitted.json"
+
+    # Treeview column layout
+    _COLS = ("file", "size", "status")
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.win = tk.Toplevel(parent)
+        self.win.title("Batch Process")
+        self.win.geometry("900x650")
+        self.win.resizable(True, True)
+
+        # queue: list of dicts {path, size, mtime, iid (treeview row id)}
+        self.queue = []
+        self.submitted = {}   # path -> {size, mtime, submitted_at, recording_id}
+        self.stop_flag = False
+        self.is_running = False
+
+        self._load_submitted()
+        self._build_ui()
+
+    # ── persistence ───────────────────────────────────────────────────────────
+
+    def _load_submitted(self):
+        try:
+            if self.SUBMITTED_FILE.exists():
+                with open(self.SUBMITTED_FILE, "r", encoding="utf-8") as f:
+                    self.submitted = json.load(f).get("files", {})
+        except Exception:
+            self.submitted = {}
+
+    def _save_submitted(self):
+        try:
+            with open(self.SUBMITTED_FILE, "w", encoding="utf-8") as f:
+                json.dump({"files": self.submitted}, f, indent=2)
+        except Exception as e:
+            print(f"Warning: could not save submitted list: {e}")
+
+    def _is_submitted(self, path, size, mtime):
+        entry = self.submitted.get(path)
+        if not entry:
+            return False
+        return entry.get("size") == size and abs(entry.get("mtime", 0) - mtime) < 2
+
+    def _mark_submitted(self, path, size, mtime, recording_id=None):
+        self.submitted[path] = {
+            "size": size,
+            "mtime": mtime,
+            "submitted_at": datetime.now().isoformat(),
+            "recording_id": recording_id,
+        }
+        self._save_submitted()
+
+    # ── UI ────────────────────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        bg = "#f0f0f0"
+        self.win.configure(bg=bg)
+
+        # ── top controls ──────────────────────────────────────────────────────
+        top = tk.Frame(self.win, bg=bg)
+        top.pack(fill=tk.X, padx=10, pady=8)
+
+        tk.Button(top, text="+ Add Folder", font=("Arial", 10),
+                  bg="#27ae60", fg="white", relief=tk.FLAT, padx=10, pady=4,
+                  command=self.add_folder).pack(side=tk.LEFT, padx=(0, 6))
+
+        tk.Button(top, text="Clear Done/Skipped", font=("Arial", 10),
+                  bg="#95a5a6", fg="white", relief=tk.FLAT, padx=10, pady=4,
+                  command=self.clear_done).pack(side=tk.LEFT, padx=(0, 6))
+
+        tk.Button(top, text="Sync from Server", font=("Arial", 10),
+                  bg="#1a6b8a", fg="white", relief=tk.FLAT, padx=10, pady=4,
+                  command=self.sync_from_server).pack(side=tk.LEFT, padx=(0, 6))
+
+        self.start_btn = tk.Button(top, text="▶ Start", font=("Arial", 10, "bold"),
+                                   bg="#27ae60", fg="white", relief=tk.FLAT,
+                                   padx=14, pady=4, command=self.start_processing)
+        self.start_btn.pack(side=tk.RIGHT, padx=(6, 0))
+
+        self.stop_btn = tk.Button(top, text="■ Stop", font=("Arial", 10),
+                                  bg="#c0392b", fg="white", relief=tk.FLAT,
+                                  padx=14, pady=4, command=self.stop_processing,
+                                  state=tk.DISABLED)
+        self.stop_btn.pack(side=tk.RIGHT, padx=(6, 0))
+
+        # ── options row ───────────────────────────────────────────────────────
+        opts = tk.Frame(self.win, bg=bg)
+        opts.pack(fill=tk.X, padx=10, pady=(0, 4))
+
+        self.submit_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(opts, text="Submit results to server", variable=self.submit_var,
+                       font=("Arial", 10), bg=bg).pack(side=tk.LEFT, padx=(0, 16))
+
+        self.annotated_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(opts, text="Save annotated videos", variable=self.annotated_var,
+                       font=("Arial", 10), bg=bg).pack(side=tk.LEFT)
+
+        # ── file treeview ─────────────────────────────────────────────────────
+        tree_frame = tk.Frame(self.win, bg=bg)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 6))
+
+        cols = ("file", "size", "status")
+        self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", height=15)
+        self.tree.heading("file",   text="File")
+        self.tree.heading("size",   text="Size")
+        self.tree.heading("status", text="Status")
+        self.tree.column("file",   width=540, stretch=True)
+        self.tree.column("size",   width=80,  anchor=tk.E, stretch=False)
+        self.tree.column("status", width=120, anchor=tk.CENTER, stretch=False)
+
+        vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=vsb.set)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # colour tags
+        self.tree.tag_configure("pending",    foreground="#2c3e50")
+        self.tree.tag_configure("skipped",    foreground="#7f8c8d")
+        self.tree.tag_configure("processing", foreground="#e67e22", font=("Arial", 9, "bold"))
+        self.tree.tag_configure("done",       foreground="#27ae60")
+        self.tree.tag_configure("failed",     foreground="#c0392b")
+
+        # ── progress bar ──────────────────────────────────────────────────────
+        prog_frame = tk.Frame(self.win, bg=bg)
+        prog_frame.pack(fill=tk.X, padx=10, pady=(0, 4))
+
+        self.progress_var = tk.DoubleVar(value=0)
+        self.progress_bar = ttk.Progressbar(prog_frame, variable=self.progress_var,
+                                             maximum=100)
+        self.progress_bar.pack(fill=tk.X)
+
+        self.progress_label = tk.Label(prog_frame, text="", font=("Arial", 9),
+                                       bg=bg, anchor=tk.W)
+        self.progress_label.pack(fill=tk.X)
+
+        # ── log area ──────────────────────────────────────────────────────────
+        log_frame = tk.LabelFrame(self.win, text="Log", font=("Arial", 10, "bold"),
+                                  bg=bg, padx=6, pady=6)
+        log_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        self.log = scrolledtext.ScrolledText(log_frame, height=6, font=("Courier", 8),
+                                             bg="white", fg="#2c3e50", state=tk.DISABLED)
+        self.log.pack(fill=tk.X)
+
+    # ── folder scanning ───────────────────────────────────────────────────────
+
+    def add_folder(self):
+        folder = filedialog.askdirectory(title="Select folder to scan", parent=self.win)
+        if not folder:
+            return
+        added = 0
+        existing_paths = {item["path"] for item in self.queue}
+        for mp4 in sorted(Path(folder).rglob("*.mp4")):
+            path = str(mp4.resolve())
+            if path in existing_paths:
+                continue
+            try:
+                stat = mp4.stat()
+                size, mtime = stat.st_size, stat.st_mtime
+            except OSError:
+                continue
+            submitted = self._is_submitted(path, size, mtime)
+            status = "skipped" if submitted else "pending"
+            size_str = self._fmt_size(size)
+            iid = self.tree.insert("", tk.END,
+                                   values=(path, size_str, status),
+                                   tags=(status,))
+            self.queue.append({"path": path, "size": size, "mtime": mtime, "iid": iid})
+            existing_paths.add(path)
+            added += 1
+        self._log(f"Added {added} file(s) from {folder}")
+
+    def clear_done(self):
+        remaining = []
+        for item in self.queue:
+            status = self.tree.set(item["iid"], "status")
+            if status in ("done", "skipped", "failed"):
+                self.tree.delete(item["iid"])
+            else:
+                remaining.append(item)
+        removed = len(self.queue) - len(remaining)
+        self.queue = remaining
+        self._log(f"Cleared {removed} entries.")
+
+    # ── server sync ───────────────────────────────────────────────────────────
+
+    def sync_from_server(self):
+        server_url = get_config_value("server_url")
+        api_key    = get_config_value("api_key")
+        if not server_url or not api_key:
+            messagebox.showerror("Error", "Configure server URL and API key in Settings first.",
+                                 parent=self.win)
+            return
+        try:
+            resp = requests.get(
+                f"{server_url}/api/my_submissions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                messagebox.showerror("Error",
+                                     f"Server returned HTTP {resp.status_code}",
+                                     parent=self.win)
+                return
+            server_filenames = set(resp.json().get("filenames", []))
+            marked = 0
+            for item in self.queue:
+                basename = Path(item["path"]).name
+                if basename in server_filenames:
+                    current = self.tree.set(item["iid"], "status")
+                    if current == "pending":
+                        self.tree.item(item["iid"], values=(item["path"],
+                                                             self._fmt_size(item["size"]),
+                                                             "skipped"),
+                                       tags=("skipped",))
+                        self._mark_submitted(item["path"], item["size"],
+                                             item["mtime"], recording_id=None)
+                        marked += 1
+            self._log(f"Synced from server: {len(server_filenames)} submissions found, "
+                      f"{marked} queue item(s) marked skipped.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Sync failed: {e}", parent=self.win)
+
+    # ── processing loop ───────────────────────────────────────────────────────
+
+    def start_processing(self):
+        pending = [i for i in self.queue
+                   if self.tree.set(i["iid"], "status") == "pending"]
+        if not pending:
+            messagebox.showinfo("Batch", "No pending files to process.", parent=self.win)
+            return
+        if self.submit_var.get():
+            if not get_config_value("server_url") or not get_config_value("api_key"):
+                messagebox.showerror("Error",
+                                     "Configure server URL and API key in Settings first.",
+                                     parent=self.win)
+                return
+        self.stop_flag = False
+        self.is_running = True
+        self.start_btn.config(state=tk.DISABLED)
+        self.stop_btn.config(state=tk.NORMAL)
+        thread = threading.Thread(
+            target=self._processing_loop, args=(pending,), daemon=True
+        )
+        thread.start()
+
+    def stop_processing(self):
+        self.stop_flag = True
+        self._log("Stop requested — finishing current file...")
+
+    def _processing_loop(self, pending):
+        total = len(pending)
+        analyse_path = get_config_value("analyse_path", "analyse.py")
+        if not os.path.isabs(analyse_path):
+            analyse_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), analyse_path
+            )
+        base_dir = os.path.dirname(analyse_path)
+        submit    = self.submit_var.get()
+        annotated = self.annotated_var.get()
+        server_url = get_config_value("server_url")
+        api_key    = get_config_value("api_key")
+
+        for idx, item in enumerate(pending):
+            if self.stop_flag:
+                self._log("Stopped.")
+                break
+
+            path = item["path"]
+            filename = Path(path).name
+            self._set_status(item["iid"], "processing")
+            self._update_progress(idx, total, f"({idx+1}/{total}) {filename}")
+            self._log(f"\n--- {filename} ---")
+
+            # build command
+            results_path = os.path.join(base_dir, "results.json")
+            cmd = [sys.executable, analyse_path,
+                   "--input", path,
+                   "--no-show",
+                   "--output-json", results_path]
+            if annotated:
+                stem = Path(path).stem
+                out_video = os.path.join(base_dir, f"{stem}_annotated.mp4")
+                cmd += ["--output", out_video]
+
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, encoding="utf-8", errors="replace",
+                    bufsize=1, cwd=base_dir,
+                )
+                for line in proc.stdout:
+                    self._log(line.rstrip())
+                proc.wait()
+
+                if proc.returncode != 0:
+                    self._log(f"Analysis failed (exit {proc.returncode})")
+                    self._set_status(item["iid"], "failed")
+                    continue
+
+                if not os.path.exists(results_path):
+                    self._log("results.json not found after analysis")
+                    self._set_status(item["iid"], "failed")
+                    continue
+
+                with open(results_path, "r", encoding="utf-8") as f:
+                    results = json.load(f)
+
+                vehicle_count = len(results.get("vehicles", []))
+
+                if submit:
+                    results["filename"] = filename
+                    location = get_config_value("last_location", "")
+                    if location:
+                        results["location_name"] = location
+                    results["camera_name"] = "Desktop App"
+                    resp = requests.post(
+                        f"{server_url}/api/submit_results",
+                        headers={"Authorization": f"Bearer {api_key}",
+                                 "Content-Type": "application/json"},
+                        json=results, timeout=60,
+                    )
+                    if resp.status_code == 201:
+                        recording_id = resp.json().get("recording_id")
+                        self._log(f"Submitted OK — recording #{recording_id}, "
+                                  f"{vehicle_count} vehicle(s)")
+                        self._mark_submitted(path, item["size"], item["mtime"],
+                                             recording_id)
+                    else:
+                        err = resp.text
+                        try:
+                            err = resp.json().get("error", err)
+                        except Exception:
+                            pass
+                        self._log(f"Submission failed HTTP {resp.status_code}: {err}")
+                        self._set_status(item["iid"], "failed")
+                        continue
+                else:
+                    self._log(f"Analysis complete — {vehicle_count} vehicle(s) (not submitted)")
+                    self._mark_submitted(path, item["size"], item["mtime"])
+
+                self._set_status(item["iid"], "done")
+
+            except Exception as e:
+                self._log(f"Error: {e}")
+                self._set_status(item["iid"], "failed")
+
+        self._update_progress(total, total, "Done")
+        self.win.after(0, lambda: self.start_btn.config(state=tk.NORMAL))
+        self.win.after(0, lambda: self.stop_btn.config(state=tk.DISABLED))
+        self.is_running = False
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _set_status(self, iid, status):
+        def _do():
+            vals = list(self.tree.item(iid, "values"))
+            vals[2] = status
+            self.tree.item(iid, values=vals, tags=(status,))
+            self.tree.see(iid)
+        self.win.after(0, _do)
+
+    def _update_progress(self, done, total, label=""):
+        pct = (done / total * 100) if total else 0
+        def _do():
+            self.progress_var.set(pct)
+            self.progress_label.config(text=label)
+        self.win.after(0, _do)
+
+    def _log(self, msg):
+        def _do():
+            self.log.config(state=tk.NORMAL)
+            self.log.insert(tk.END, msg + "\n")
+            self.log.see(tk.END)
+            self.log.config(state=tk.DISABLED)
+        self.win.after(0, _do)
+
+    @staticmethod
+    def _fmt_size(n):
+        for unit in ("B", "KB", "MB", "GB"):
+            if n < 1024:
+                return f"{n:.0f} {unit}"
+            n /= 1024
+        return f"{n:.1f} TB"
 
 
 # ─── Zone Editor ──────────────────────────────────────────────────────────────

@@ -698,6 +698,19 @@ def api_location_summary(location_name):
     return jsonify({"error": "No data for location"}), 404
 
 
+@app.route("/api/my_submissions", methods=["GET"])
+@auth.require_auth
+def api_my_submissions(user):
+    """Return list of filenames already submitted by this user (for local dedup)."""
+    rows = _query(
+        """SELECT filename FROM recordings
+           WHERE user_id = %s AND submission_source = 'remote'
+           ORDER BY recorded_at DESC""",
+        (user["id"],),
+    )
+    return jsonify({"filenames": [r["filename"] for r in rows]})
+
+
 @app.route("/api/submit_results", methods=["POST"])
 @auth.require_auth
 def api_submit_results(user):
@@ -729,11 +742,8 @@ def api_submit_results(user):
         else:
             recorded_at = datetime.now()
 
-        # Use just the basename as the stored filename (no disk write needed here)
-        basename = os.path.splitext(os.path.basename(filename))[0]
-        safe_name = re.sub(r"[^\w\-]", "_", basename)[:64]
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        stored_filename = f"remote_{user['id']}_{safe_name}_{ts}"
+        # Store the original basename so /api/my_submissions can return it for dedup
+        stored_filename = os.path.basename(filename)
 
         recording_id = db.insert_recording(
             filename=stored_filename,
